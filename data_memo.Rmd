@@ -1,0 +1,39 @@
+---
+title: "Data Memo"
+author: "Iris Foxfoot, Dylan Berneman, Seonga Cho"
+date: "1/23/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+## Dataset Overview
+
+What does it include?
+Where and how will you be obtaining it? Include the link and source.
+About how many observations? How many predictors?
+What types of variables will you be working with?
+Is there any missing data? About how much? Do you have an idea for how to handle it?
+
+## Research Questions
+
+What variable(s) are you interested in predicting? What question(s) are you interested in answering?
+Name your response/outcome variable(s) and briefly describe it/them.
+Will these questions be best answered with a classification or regression approach?
+Which predictors do you think will be especially useful?
+
+## Timeline and Group Work Plan
+
+How is your group dividing up the work?
+When do you plan on having your data set loaded, beginning your exploratory data analysis, etc?
+
+## Questions or Concerns
+
+Are there any problems or difficult aspects of the project you anticipate?
+Any specific questions you have for me/the instructional team?
