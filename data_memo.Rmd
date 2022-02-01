@@ -13,27 +13,47 @@ knitr::opts_chunk$set(
 )
 ```
 
-## Dataset Overview
+# 1. Dataset Overview
 
-What does it include?
-Where and how will you be obtaining it? Include the link and source.
-About how many observations? How many predictors?
-What types of variables will you be working with?
-Is there any missing data? About how much? Do you have an idea for how to handle it?
+## 1) Data description
 
-## Research Questions
+### In PSTAT 231 project, our team defined the wildfire issue as a key topic. Many wildfire data were constructed to solve wildfire-related problems. We accessed multiple sources to collect the data. The first data we dealt with is California’s wildfire boundary history file. It contains all of the wildfire’s boundaries from 1920. The boundary was updated on a daily scale. Because the data was published by CalFire, the reliability of the data is very high. The second dataset is California WildFires. It is a list of wildfires in California between 2013 and 2020.  It is not spatial data, but it can be integrated with US Wildfire data. The data contains spatial attributes of wildfires. Both datasets were acquired through Kaggle. And combined dataset can improve the data quality.
 
-What variable(s) are you interested in predicting? What question(s) are you interested in answering?
-Name your response/outcome variable(s) and briefly describe it/them.
-Will these questions be best answered with a classification or regression approach?
-Which predictors do you think will be especially useful?
+## 2) Variable description
 
-## Timeline and Group Work Plan
+### Multiple datasets contain various variables. The variables were divided into two categories. First, spatial or temporal variables have wildfire’s spatial or temporal aspects. GIS data and time-series characteristics contain special aspects of wildfires. The second variable type is attribute variables. The number of wildfires, temperature, or precipitation is a kind of attribute variable. By dealing with multiple types of variables, machine learning or classification methods can be applied to the dataset. 
 
-How is your group dividing up the work?
-When do you plan on having your data set loaded, beginning your exploratory data analysis, etc?
+[California WildFires (2013-2020)](https://www.kaggle.com/ananthu017/california-wildfire-incidents-20132020)
 
-## Questions or Concerns
+[California Wildfires boundary](https://drive.google.com/open?id=1kl-LdvoA-_a_jXSbGdUUvnsCDbUOmrpe&authuser=seonga_cho%40ucsb.edu&usp=drive_fs)
 
-Are there any problems or difficult aspects of the project you anticipate?
-Any specific questions you have for me/the instructional team?
+[US Wildfire data (Kaggle)](https://www.kaggle.com/capcloudcoder/us-wildfire-data-plus-other-attributes/code)
+
+# 2. Research Questions
+
+## 1) Research topic
+
+### This project is exploring the relationship between climate change and wildfire emergence pattern. Climate change has been recognized as one of the significant issues these days. Climate change is a well-known concept, but also it involves a very broad spectrum of phenomena over the world. It is not only implementing the increase of annual mean temperature but also including the frequent occurrence of extreme weather events, such as the large variance of precipitation or frequent heatwaves. Also, as climate change accelerated, extreme weather events have shown a heterogeneity pattern globally (Hansen et al., 2012). It means that each region will suffer unique patterns of extreme weather events, and it will be deepened with the acceleration of climate change. In California, one of the most severe extreme weather events is wildfire (Westerling and Bryant, 2008; Westerling et al., 2011). The impact of climate change, particularly during the anthropogenic era, on wildfires, has been recognized as a very important topic.
+
+### Wildfire issues in California have been dealt with from various perspectives from wildfire event pattern analysis to finding optimal evacuation strategies (Fried et al., 2004; Hurteau et al., 2014; Wong et al., 2020). However, one of the common objectives of those research is that mitigate wildfire damage and risk management. It has been more important due to a reducing return period, also known as a recurrence interval. The reducing return period of extreme weather events is the key element of climate change (Hirabayashi et al., 2013), and it will impair environmental resilience on wildfire significantly. To minimize the wildfire damage and threatening efficiently, early identification of wildfire is regarded as a highly important topic. 
+
+
+## 2) Research question
+
+### This project defined two research questions. The first research question is exploring the relationship between global warming and wildfire emergence pattern. The number of wildfires has been increasing according to climate change and temperature increase. Also, the number of wildfires can be predicted by the temperature and global warming-related characteristics. The second research question is the heterogeneity of wildfire severity on a state scale. If global warming affected the wildfire pattern, we can imagine that the wildfire severity would show the spatial difference in California. The different spatial patterns will be unveiled in this research. 
+
+# 3. Timeline and Group Work Plan
+
+### Although we each plan to contribute to all portions of the final project, Iris Foxfoot will lead data visualization, Seonga Cho will lead data cleaning/analysis, and Dylan Berneman will lead model selection. 
+
+### Our timeline is as follows:
+* Begin loading and cleaning the data in week four
+* Create exploratory visualizations and preliminary analysis in week five and six
+* Split the data and begin selecting models in week seven and eight
+* Create predictions in week nine
+* Write up results in week ten
+
+
+# 4. Questions or Concerns
+
+### We do not anticipate any major challenges in this analysis. 
