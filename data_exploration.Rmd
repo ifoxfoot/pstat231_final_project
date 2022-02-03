@@ -1,0 +1,35 @@
+---
+title: "wildfire_exploration"
+author: "Iris Foxfoot"
+date: "2/3/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+```
+
+```{r}
+#read in datasets
+ca_wildfire <- read_csv(here("California_Fire_Incidents.csv"))
+
+us_wildfire <- read_csv(here("archive", "FW_Veg_Rem_Combined.csv"))
+```
+
+```{r}
+#explore us wildfire dataset
+
+#17630 rows with no NAs
+us_wildfire_no_na <- na.omit(us_wildfire)
+
+#41132 entries with weather data
+us_wildfire_weather <- us_wildfire %>% 
+  filter(weather_file != "File Not Found")
+
+#note, put out time is not accurate but can be recalculated
+
+hist(us_wildfire_weather$Temp_pre_30)
+```
+
