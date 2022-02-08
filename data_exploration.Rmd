@@ -1,15 +1,42 @@
 ---
-title: "wildfire_exploration"
+title: "Wildfire Exploration"
 author: "Iris Foxfoot"
 date: "2/3/2022"
-output: html_document
+output: 
+  html_document:
+    toc: true # table of content true
+    toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)
+    number_sections: true  ## if you want number sections at each table header
+    theme: united  # many options for theme, this one is my favorite.
+    highlight: tango  # specifies the syntax highlighting style
+    toc_float: true
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
 library(tidyverse)
 library(here)
 ```
+
+# Introduction
+
+What is the purpose and objectives of this project
+
+## Background
+
+fire situation in North America, climate change, etc
+
+## Why this model is useful
+
+What will it be used for?
+
+## Data and Packages Used
+
+where the data came from, what it contains, etc
 
 ```{r}
 #read in datasets
@@ -30,6 +57,55 @@ us_wildfire_weather <- us_wildfire %>%
 
 #note, put out time is not accurate but can be recalculated
 
+#histogram of temp 30 days before fire
 hist(us_wildfire_weather$Temp_pre_30)
+
+hist(us_wildfire_weather$Temp_pre_7)
 ```
+
+# Methods
+
+Overview of methods
+
+## Cleaning Data
+ 
+what we did to clean the data
+
+## Exploratory Analysis
+
+~ a few key graphs, exploring data
+
+ideas for graphs
+  - map of fires
+  - causes of fires
+  - duration of fires
+  - vegetation
+  - destruction
+  - weather conditions
+
+## Splitting Data
+
+Split into testing and training data
+
+
+## Modeling
+
+what type of modeling will we do? we must try more than one type
+
+## Cross Validation
+
+Which model is best?
+
+## Final Model Selection
+
+## Test Error
+
+# Results
+
+predictions without climate change
+
+How do predictions change with 2.5C increase in temp?
+
+# Conclusion
+
 
