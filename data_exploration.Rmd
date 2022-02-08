@@ -9,7 +9,7 @@ output:
     number_sections: true  ## if you want number sections at each table header
     theme: united  # many options for theme, this one is my favorite.
     highlight: tango  # specifies the syntax highlighting style
-    toc_float: true
+    toc_float: true #makes table of contents float while scrolling
 ---
 
 ```{r setup, include=FALSE}
