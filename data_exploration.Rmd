@@ -157,6 +157,13 @@ fire_test <- testing(us_wildfire_split)
 
 ## Modeling
 
+Linear modeling 
+
+```{r}
+fire_size_lm <- lm(fire_size ~ ., data = fire_train)
+```
+
+
 what type of modeling will we do? we must try 4 types
 
 - multiple linear regression
