@@ -22,6 +22,9 @@ knitr::opts_chunk$set(
 library(tidyverse) #used for data wrangling and viz
 library(here) #simplifies file paths
 library(rsample) #used to split data
+library(janitor) #used to clean data names
+library(tidymodels)
+#library(skimr)
 ```
 
 # Introduction
@@ -57,7 +60,7 @@ A complete codebook is available in the project file
 us_wildfire <- read_csv(here("archive", "FW_Veg_Rem_Combined.csv"))
 
 #show head
-slice_max(us_wildfire, 5)
+glimpse(us_wildfire, 5)
 ```
 
 # Methods
@@ -71,16 +74,26 @@ what we did to clean the data
 ```{r}
 #First, there are a couple of junk columns in the data, so we select only the columns that mean something
 us_wildfire_clean <- us_wildfire %>% 
-  select(fire_name:remoteness)
+  select(fire_name:remoteness) %>% 
+  clean_names()
 
 #we are interested in using weather to predict fire duration, so we select observations that have a weather file
 us_wildfire_clean <- us_wildfire_clean %>% 
   filter(weather_file != "File Not Found")
 
+#NOTE. we should correct vegetation with accurate label
+us_wildfire_clean$vegetation <- as.factor(us_wildfire_clean$vegetation)
+
 #NOTE. There are some remaining observations for which every weather field is 0. this seems unlikely
 
 #NOTE. The put_out time is incorrectly calculated so we must calculate it
 
+#there are multiple date columns. we only want to keep the ones with "final" in the name
+us_wildfire_clean <- us_wildfire_clean %>% 
+  select(-disc_clean_date, 
+         -disc_date_pre, 
+         -cont_clean_date, 
+         -disc_pre_month)
 ```
 
 ## Exploratory Analysis
@@ -130,7 +143,6 @@ ggplot(data = fire_causes, aes(y = reorder(stat_cause_descr, n), x = n)) +
 #distribution of fire size  
 ggplot(data = us_wildfire_clean, aes(x = fire_size)) +  
   geom_histogram(bins = 100)
-
 ```
 
 ideas for graphs
@@ -157,10 +169,55 @@ fire_test <- testing(us_wildfire_split)
 
 ## Modeling
 
-Linear modeling 
+### Model Preparation
+
+To begin modeling we first select independent variables we wish to use, and we also set up cross validation infrastucture. For cross validation we will use repeated K folding.
 
 ```{r}
-fire_size_lm <- lm(fire_size ~ ., data = fire_train)
+#select independent variables to use in modeling
+independent_vars <- us_wildfire_clean %>%
+  select(-fire_name, #remove fire name
+         -fire_size, #remove fire size (we are predicting this!)
+         -fire_size_class, #remove fire size class
+         -wstation_usaf, #remove weather station name
+         -wstation_wban, #remove this (not described in codebook)
+         -wstation_byear, #remove station year installed
+         -wstation_eyear, #remove station year ended data recording
+         -weather_file, #remove name of weather file
+         -dstation_m, #remove distance of weather station to fire
+         -cont_date_final, #NOTE, not sure if we should remove this and below
+         -disc_date_final,
+         -temp_cont,
+         -wind_cont,
+         -hum_cont,
+         -prec_cont,
+         -putout_time,
+         ) %>%  
+  names(.) 
+
+#show final list of predictors
+print(independent_vars)
+
+#set up a recipe for modeling NOT WORKING YET
+recipe <- recipe(fire_size ~ stat_cause_descr + latitude + longitude + state + discovery_month + disc_pre_year + vegetation + fire_mag + temp_pre_30 + temp_pre_15 + temp_pre_7 + wind_pre_30 + wind_pre_15 + wind_pre_7 + hum_pre_30 + hum_pre_15 + hum_pre_7 + prec_pre_30 + prec_pre_15 + prec_pre_7 + remoteness, data = fire_train)
+```
+
+```{r}
+#set up folds in training data for cross validation
+train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
+```
+
+### Linear Regression
+
+```{r}
+#run a lm
+fire_size_lm <- lm(fire_size ~ stat_cause_descr + latitude + longitude + state + discovery_month + disc_pre_year + vegetation + fire_mag + temp_pre_30 + temp_pre_15 + temp_pre_7 + wind_pre_30 + wind_pre_15 + wind_pre_7 + hum_pre_30 + hum_pre_15 + hum_pre_7 + prec_pre_30 + prec_pre_15 + prec_pre_7 + remoteness, data = fire_train)
+
+#summarise the model
+summary(fire_size_lm)
+
+#calculate mse
+mean(fire_size_lm$residuals^2)
 ```
 
 
