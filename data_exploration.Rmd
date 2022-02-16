@@ -49,9 +49,9 @@ Important attributes include
 
 *`stat_cause_descr` - the cause of the fire
 
-*`Vegetation` - code corresponding to vegetation type
+*`vegetation` - code corresponding to vegetation type
 
-*`Temp_cont` - temperature (Celsius) when the fire was contained
+*`temp_cont` - temperature (Celsius) when the fire was contained
 
 A complete codebook is available in the project file
 
@@ -59,7 +59,7 @@ A complete codebook is available in the project file
 #read in dataset
 us_wildfire <- read_csv(here("archive", "FW_Veg_Rem_Combined.csv"))
 
-#show head
+#have a peak at the data
 glimpse(us_wildfire, 5)
 ```
 
