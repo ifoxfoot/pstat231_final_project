@@ -6,7 +6,7 @@ output:
   html_document:
     toc: true # table of content true
     toc_depth: 3  # upto three depths of headings (specified by #, ## and ###)
-    number_sections: true  ## if you want number sections at each table header
+    number_sections: true  # if you want number sections at each table header
     theme: united  # many options for theme, this one is my favorite.
     highlight: tango  # specifies the syntax highlighting style
     toc_float: true #makes table of contents float while scrolling
@@ -19,12 +19,23 @@ knitr::opts_chunk$set(
 	message = FALSE,
 	warning = FALSE
 )
+#library(raster) #used for extracting vegetation
 library(tidyverse) #used for data wrangling and viz
 library(here) #simplifies file paths
 library(rsample) #used to split data
 library(janitor) #used to clean data names
-library(tidymodels)
-#library(skimr)
+library(tidymodels) #used for modeling workflow
+library(caret) #for cross validation
+library(gbm) #for boosted trees modeling
+library(randomForest) #for random forest modeling
+
+
+
+#turns scientific notation off
+options(scipen = 100)
+
+#some of our workflow includes randomness. here we set a seed so our workflow can be reproduced without worrying about random variation
+set.seed(123) 
 ```
 
 # Introduction
@@ -72,28 +83,45 @@ Overview of methods
 what we did to clean the data
 
 ```{r}
-#First, there are a couple of junk columns in the data, so we select only the columns that mean something
+#First, there are a couple of junk columns in the data, so we select only the columns that mean something, then we use janitor's clean names function for lowercase snake col names
 us_wildfire_clean <- us_wildfire %>% 
-  select(fire_name:remoteness) %>% 
+  dplyr::select(fire_name:remoteness) %>% 
   clean_names()
 
-#we are interested in using weather to predict fire duration, so we select observations that have a weather file
+#we are interested in using weather to predict fire duration, so we filter out observations that do not have a weather file
 us_wildfire_clean <- us_wildfire_clean %>% 
   filter(weather_file != "File Not Found")
 
-#NOTE. we should correct vegetation with accurate label
-us_wildfire_clean$vegetation <- as.factor(us_wildfire_clean$vegetation)
-
-#NOTE. There are some remaining observations for which every weather field is 0. this seems unlikely
-
-#NOTE. The put_out time is incorrectly calculated so we must calculate it
-
-#there are multiple date columns. we only want to keep the ones with "final" in the name
+#Here we label vegetation according to the provided codebook
 us_wildfire_clean <- us_wildfire_clean %>% 
-  select(-disc_clean_date, 
+  mutate(vegetation_classed = case_when(
+    vegetation == 12 ~ "Open Shrubland",
+    vegetation == 15 ~ "Polar Desert/Rock/Ice",
+    vegetation == 16 ~ "Secondary Tropical Evergreen Broadleaf Forest",
+    vegetation == 4 ~ "Temperate Evergreen Needleleaf Forest TmpENF",
+    vegetation == 9 ~ "C3 Grassland/Steppe",
+    vegetation == 14 ~ "Desert"
+  ))
+
+#According the metadata for this data set, the vegetation was created by interpolating most likely vegetation based on latitude and longitude. The most common vegetation type is listed as "Polar Desert/Rock/Ice" and this seems very unlikely.
+
+#There are some weather observations for which every weather field is 0. this seems unlikely. so we will replace them with NA
+us_wildfire_clean <- us_wildfire_clean %>%
+  mutate_at(vars(temp_pre_30:hum_cont), ~na_if(., 0.0000000))
+
+#NOTE consider imputing missing data
+  
+
+#there are multiple date columns. however, since full dates are mostly missing, we will only keep month and year as variables
+us_wildfire_clean <- us_wildfire_clean %>% 
+  dplyr::select(-disc_clean_date, 
          -disc_date_pre, 
          -cont_clean_date, 
-         -disc_pre_month)
+         -disc_pre_month,
+         -disc_date_final,
+         -cont_date_final,
+         -putout_time) %>% 
+  filter(!is.na(fire_size))
 ```
 
 ## Exploratory Analysis
@@ -101,9 +129,6 @@ us_wildfire_clean <- us_wildfire_clean %>%
 ~ a few key graphs, exploring data
 
 ```{r}
-#turns scientific notation off
-options(scipen = 100)
-
 #summarise acres per year burned
 acres_per_year <- us_wildfire_clean %>% 
   group_by(disc_pre_year) %>% 
@@ -143,6 +168,23 @@ ggplot(data = fire_causes, aes(y = reorder(stat_cause_descr, n), x = n)) +
 #distribution of fire size  
 ggplot(data = us_wildfire_clean, aes(x = fire_size)) +  
   geom_histogram(bins = 100)
+
+#It is likely that weather columns are correlated. to investigate this we create a correlation matrix
+
+#create a dataframe of weatehr
+weather <- us_wildfire_clean %>% 
+  dplyr::select(temp_pre_30:prec_cont)
+
+#create a correlation matrix (omitting NAs)
+cor_matrix <- cor(weather, use = "complete.obs")
+
+#create a visualization
+library(corrplot)
+corrplot(cor_matrix, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+#we can see that their is a strong correlation with each set of variables. i.e. temperature 7 days before the fire is correlated with temp 30 days before the fire. 
+
+#consider PCA on wind, PCA on hum, PCA on temp
 ```
 
 ideas for graphs
@@ -151,33 +193,16 @@ ideas for graphs
   - vegetation
   - weather conditions
 
-## Splitting Data
+## Model Preparation
 
 We split our data into 80% training and 20% testing data. Because fire size is heavily skewed towards smaller fires, we used stratified sampling.
 
 There are 32903 observations in the training set and 8229 observations in the test dataset.
 
 ```{r}
-#define split parameters
-us_wildfire_split <- us_wildfire_clean %>% 
-  initial_split(prop = 0.8, strata = "fire_size")
-
-#write split data to data frames
-fire_train <- training(us_wildfire_split)
-fire_test <- testing(us_wildfire_split)
-```
-
-## Modeling
-
-### Model Preparation
-
-To begin modeling we first select independent variables we wish to use, and we also set up cross validation infrastucture. For cross validation we will use repeated K folding.
-
-```{r}
-#select independent variables to use in modeling
-independent_vars <- us_wildfire_clean %>%
-  select(-fire_name, #remove fire name
-         -fire_size, #remove fire size (we are predicting this!)
+#first we make a dataframe containing only variables we want to use to predict
+fire_modeling_df <- us_wildfire_clean %>%
+  dplyr::select(-fire_name, #remove fire name
          -fire_size_class, #remove fire size class
          -wstation_usaf, #remove weather station name
          -wstation_wban, #remove this (not described in codebook)
@@ -185,39 +210,117 @@ independent_vars <- us_wildfire_clean %>%
          -wstation_eyear, #remove station year ended data recording
          -weather_file, #remove name of weather file
          -dstation_m, #remove distance of weather station to fire
-         -cont_date_final, #NOTE, not sure if we should remove this and below
-         -disc_date_final,
-         -temp_cont,
-         -wind_cont,
-         -hum_cont,
-         -prec_cont,
-         -putout_time,
-         ) %>%  
-  names(.) 
+         -vegetation #remove because we have it classed in another col
+         ) %>% 
+  mutate_if(is.character,as.factor) %>% #turn all character cols into factors
+  mutate(disc_pre_year = as.factor(disc_pre_year)) %>% #turn year into factor
+  na.omit(.) #taking out all NAs.
 
-#show final list of predictors
-print(independent_vars)
+#NOTE, Consider Imputing!
+  
+#define split parameters
+us_wildfire_split <- fire_modeling_df %>% 
+  initial_split(prop = 0.8, strata = "fire_size")
 
-#set up a recipe for modeling NOT WORKING YET
-recipe <- recipe(fire_size ~ stat_cause_descr + latitude + longitude + state + discovery_month + disc_pre_year + vegetation + fire_mag + temp_pre_30 + temp_pre_15 + temp_pre_7 + wind_pre_30 + wind_pre_15 + wind_pre_7 + hum_pre_30 + hum_pre_15 + hum_pre_7 + prec_pre_30 + prec_pre_15 + prec_pre_7 + remoteness, data = fire_train)
-```
+#write split data to data frames
+fire_train <- training(us_wildfire_split)
+fire_test <- testing(us_wildfire_split)
 
-```{r}
 #set up folds in training data for cross validation
 train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
+```
+
+## Modeling
+
+```{r}
+#if we want to use tidy models workflow
+
+#set up a recipe for modeling NOT WORKING YET
+# recipe <- recipe(fire_size ~ stat_cause_descr + latitude + longitude + state + discovery_month + disc_pre_year + vegetation + fire_mag + temp_pre_30 + temp_pre_15 + temp_pre_7 + wind_pre_30 + wind_pre_15 + wind_pre_7 + hum_pre_30 + hum_pre_15 + hum_pre_7 + prec_pre_30 + prec_pre_15 + prec_pre_7 + remoteness, data = fire_train)
 ```
 
 ### Linear Regression
 
 ```{r}
-#run a lm
-fire_size_lm <- lm(fire_size ~ stat_cause_descr + latitude + longitude + state + discovery_month + disc_pre_year + vegetation + fire_mag + temp_pre_30 + temp_pre_15 + temp_pre_7 + wind_pre_30 + wind_pre_15 + wind_pre_7 + hum_pre_30 + hum_pre_15 + hum_pre_7 + prec_pre_30 + prec_pre_15 + prec_pre_7 + remoteness, data = fire_train)
+# #run a lm
+# fire_size_lm <- train(fire_size ~ ., 
+#                       data = fire_train,
+#                       method = "lm",
+#                       trControl = train_folds)
+# 
+# #summarise the model
+# summary(fire_size_lm)
+```
 
-#summarise the model
-summary(fire_size_lm)
+### K Nearest Neighbor
 
-#calculate mse
-mean(fire_size_lm$residuals^2)
+
+### Boosted Tree
+
+```{r}
+#train boosted tree model
+fire_size_boost = gbm(fire_size~., 
+                      data = fire_train,
+                      n.trees = 500, 
+                      interaction.depth = 4
+                    )
+
+#the model summary creates a pretty visualization
+summary(fire_size_boost)
+
+#calculate training error
+
+#predict values using training data
+predictions_train_boost <- predict(fire_size_boost, data = fire_train)
+
+#calculate rmse for training data
+RMSE(predictions_train_boost, fire_train$fire_size)
+
+#calculate test error
+
+#predict values using test data
+predictions_test_boost <- predict(fire_size_boost, data = fire_test)
+
+#calculate rmse for training data
+RMSE(predictions_test_boost, fire_test$fire_size)
+```
+
+### Random Forest
+
+```{r}
+#train model
+fire_size_rf = randomForest(fire_size ~ ., #writing the formula
+                          data = fire_train, #specifying training data to be used
+                          mtry = 9, #setting number of variables to randomly sample per each split
+                          ntree= 500, #setting number of trees
+                          mode = "regression", #specifying regression
+                          na.action = na.omit, #specifying what to do with NAs
+                          importance = TRUE #specifying importance of variables should be assessed
+                          )
+#plot error
+plot(fire_size_rf)
+
+#plot variable importance
+varImpPlot(fire_size_rf, 
+           sort = T, 
+           main = "Variable Importance for fire size random forest model", 
+           n.var = 5)
+
+#calculate training error
+
+#predict values using training data
+predictions_train <- predict(fire_size_rf, data = fire_train)
+
+#calculate rmse for training data
+RMSE(predictions_train, fire_train$fire_size)
+
+#calculate test error
+
+#predict values using test data
+predictions_test <- predict(fire_size_rf, data = fire_test)
+
+#calculate rmse for training data
+RMSE(predictions_test, fire_test$fire_size)
 ```
 
 
@@ -226,16 +329,8 @@ what type of modeling will we do? we must try 4 types
 - multiple linear regression
 - K nearest Neighbor
 - Random Forest
+- Boosted Tree
 - neural network
-
-
-## Cross Validation
-
-Which model is best?
-
-## Final Model Selection
-
-## Test Error
 
 # Results
 
