@@ -19,7 +19,7 @@ knitr::opts_chunk$set(
 	message = FALSE,
 	warning = FALSE
 )
-#library(raster) #used for extracting vegetation
+
 library(tidyverse) #used for data wrangling and viz
 library(here) #simplifies file paths
 library(rsample) #used to split data
@@ -243,7 +243,7 @@ train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
 
 ```{r}
 # #run a lm
-# fire_size_lm <- train(fire_size ~ ., 
+# fire_size_lm <- train(fire_size ~ .,
 #                       data = fire_train,
 #                       method = "lm",
 #                       trControl = train_folds)
@@ -309,27 +309,24 @@ varImpPlot(fire_size_rf,
 #calculate training error
 
 #predict values using training data
-predictions_train <- predict(fire_size_rf, data = fire_train)
+predictions_train_rf <- predict(fire_size_rf, data = fire_train)
 
 #calculate rmse for training data
-RMSE(predictions_train, fire_train$fire_size)
+RMSE(predictions_train_rf, fire_train$fire_size)
 
 #calculate test error
 
 #predict values using test data
-predictions_test <- predict(fire_size_rf, data = fire_test)
+predictions_test_rf <- predict(fire_size_rf, data = fire_test)
 
 #calculate rmse for training data
-RMSE(predictions_test, fire_test$fire_size)
+RMSE(predictions_test_rf, fire_test$fire_size)
 ```
-
 
 what type of modeling will we do? we must try 4 types
 
 - multiple linear regression
 - K nearest Neighbor
-- Random Forest
-- Boosted Tree
 - neural network
 
 # Results
