@@ -122,7 +122,19 @@ ggplot() +
   guides(color=guide_legend(title="Wild Fire Scale"))+
   coord_map(projection = "sinusoidal", xlim=c(-120, -75), ylim = c(25, 50))
 
-
+ggplot() + 
+  geom_density(data= us_wildfire_clean[which(us_wildfire_clean$wstation_byear <= 1970 & us_wildfire_clean$fire_size > 100),], aes(x = fire_size, y=..density..),
+               alpha=.3,
+               colour="dodgerblue", fill="dodgerblue") + 
+  geom_density(data= us_wildfire_clean[which(us_wildfire_clean$wstation_byear >= 1970 & us_wildfire_clean$fire_size > 100 & us_wildfire_clean$wstation_byear < 2000),], aes(x = fire_size, y=..density..),
+               alpha=.3,
+               colour="yellow3", fill="yellow3") + 
+  geom_density(data= us_wildfire_clean[which(us_wildfire_clean$wstation_byear >= 2000 & us_wildfire_clean$fire_size > 100),], aes(x = fire_size, y=..density..),
+               alpha=.3,
+                 colour="firebrick3", fill="firebrick3") + 
+  xlim(10000, 100000) + 
+  ggtitle("Wildfire Severeity")
+  
 ########### not used
 require(albersusa) || install.packages(albersusa, dependencies = TRUE)
 library(ggplot2)
