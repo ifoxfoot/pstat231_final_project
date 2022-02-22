@@ -24,6 +24,7 @@ library(tidyverse) #used for data wrangling and viz
 library(here) #simplifies file paths
 library(rsample) #used to split data
 library(janitor) #used to clean data names
+library(corrplot) #for correlation viz
 library(tidymodels) #used for modeling workflow (MAYBE)
 library(caret) #for cross validation
 library(class) #for knn
@@ -170,7 +171,7 @@ ggplot(data = us_wildfire_clean, aes(x = fire_size)) +
 
 #It is likely that weather columns are correlated. to investigate this we create a correlation matrix
 
-#create a dataframe of weatehr
+#create a dataframe of weather
 weather <- us_wildfire_clean %>% 
   dplyr::select(temp_pre_30:prec_cont)
 
@@ -178,7 +179,6 @@ weather <- us_wildfire_clean %>%
 cor_matrix <- cor(weather, use = "complete.obs")
 
 #create a visualization
-library(corrplot)
 corrplot(cor_matrix, type = "upper", order = "hclust", 
          tl.col = "black", tl.srt = 45)
 #we can see that their is a strong correlation with each set of variables. i.e. temperature 7 days before the fire is correlated with temp 30 days before the fire. 
@@ -195,7 +195,7 @@ ideas for graphs
 
 We split our data into 80% training and 20% testing data. Because fire size is heavily skewed towards smaller fires, we used stratified sampling.
 
-There are 32903 observations in the training set and 8229 observations in the test set.
+There are xyz observations in the training set and xyz observations in the test set.
 
 ```{r}
 #first we make a dataframe containing only variables we want to use to predict
@@ -210,7 +210,7 @@ fire_modeling_df <- us_wildfire_clean %>%
          -dstation_m, #remove distance of weather station to fire
          -vegetation #remove because we have it classed in another col
          ) %>% 
-  mutate_if(is.character,as.factor) %>% #turn all character cols into factors
+  mutate_if(is.character, as.factor) %>% #turn all character cols into factors
   mutate(disc_pre_year = as.factor(disc_pre_year)) %>% #turn year into factor
   na.omit(.) #taking out all NAs.
   
@@ -244,14 +244,11 @@ regression_recipe <- recipe(
              disc_pre_year,
              vegetation_classed, 
              one_hot = T) %>% 
-    #scale numeric predictors
+  #scale numeric predictors
   step_center(all_predictors()) %>% 
   step_scale(all_predictors())
   )
 ```
-
-### Linear Regression
-
 
 ### K Nearest Neighbor
 
