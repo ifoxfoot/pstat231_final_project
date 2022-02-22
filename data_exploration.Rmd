@@ -10,10 +10,10 @@ output:
     theme: united  # many options for theme, this one is my favorite.
     highlight: tango  # specifies the syntax highlighting style
     toc_float: true #makes table of contents float while scrolling
-    code_folding: hide
+    code_folding: hide #enables code folding
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=T}
 knitr::opts_chunk$set(
 	echo = TRUE,
 	message = FALSE,
@@ -24,11 +24,11 @@ library(tidyverse) #used for data wrangling and viz
 library(here) #simplifies file paths
 library(rsample) #used to split data
 library(janitor) #used to clean data names
-library(tidymodels) #used for modeling workflow
+library(tidymodels) #used for modeling workflow (MAYBE)
 library(caret) #for cross validation
+library(class) #for knn
 library(gbm) #for boosted trees modeling
 library(randomForest) #for random forest modeling
-
 
 
 #turns scientific notation off
@@ -56,13 +56,13 @@ This dataset is available on Kaggle. It is a subset of larger fires
 
 Important attributes include
 
-*`fire_size` - the size of the fire in acres
+* `fire_size` - the size of the fire in acres
 
-*`stat_cause_descr` - the cause of the fire
+* `stat_cause_descr` - the cause of the fire
 
-*`vegetation` - code corresponding to vegetation type
+* `vegetation` - code corresponding to vegetation type
 
-*`temp_cont` - temperature (Celsius) when the fire was contained
+* `temp_cont` - temperature (Celsius) when the fire was contained
 
 A complete codebook is available in the project file
 
@@ -120,8 +120,7 @@ us_wildfire_clean <- us_wildfire_clean %>%
          -disc_pre_month,
          -disc_date_final,
          -cont_date_final,
-         -putout_time) %>% 
-  filter(!is.na(fire_size))
+         -putout_time)
 ```
 
 ## Exploratory Analysis
@@ -189,7 +188,6 @@ corrplot(cor_matrix, type = "upper", order = "hclust",
 
 ideas for graphs
   - map of fires
-  - duration of fires
   - vegetation
   - weather conditions
 
@@ -197,7 +195,7 @@ ideas for graphs
 
 We split our data into 80% training and 20% testing data. Because fire size is heavily skewed towards smaller fires, we used stratified sampling.
 
-There are 32903 observations in the training set and 8229 observations in the test dataset.
+There are 32903 observations in the training set and 8229 observations in the test set.
 
 ```{r}
 #first we make a dataframe containing only variables we want to use to predict
@@ -215,8 +213,6 @@ fire_modeling_df <- us_wildfire_clean %>%
   mutate_if(is.character,as.factor) %>% #turn all character cols into factors
   mutate(disc_pre_year = as.factor(disc_pre_year)) %>% #turn year into factor
   na.omit(.) #taking out all NAs.
-
-#NOTE, Consider Imputing!
   
 #define split parameters
 us_wildfire_split <- fire_modeling_df %>% 
@@ -230,30 +226,79 @@ fire_test <- testing(us_wildfire_split)
 train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
 ```
 
-## Modeling
+## Modeling As a Regression Problem
 
 ```{r}
 #if we want to use tidy models workflow
 
 #set up a recipe for modeling NOT WORKING YET
-# recipe <- recipe(fire_size ~ stat_cause_descr + latitude + longitude + state + discovery_month + disc_pre_year + vegetation + fire_mag + temp_pre_30 + temp_pre_15 + temp_pre_7 + wind_pre_30 + wind_pre_15 + wind_pre_7 + hum_pre_30 + hum_pre_15 + hum_pre_7 + prec_pre_30 + prec_pre_15 + prec_pre_7 + remoteness, data = fire_train)
+regression_recipe <- recipe(
+  #set up formuala to use
+  fire_size ~ .,
+  #specify use of training data
+  data = fire_train,
+  #One_hot encode all nominal predictors (dummy code them)
+  step_dummy(stat_cause_descr,
+             state,
+             discovery_month,
+             disc_pre_year,
+             vegetation_classed, 
+             one_hot = T) %>% 
+    #scale numeric predictors
+  step_center(all_predictors()) %>% 
+  step_scale(all_predictors())
+  )
 ```
 
 ### Linear Regression
 
-```{r}
-# #run a lm
-# fire_size_lm <- train(fire_size ~ .,
-#                       data = fire_train,
-#                       method = "lm",
-#                       trControl = train_folds)
-# 
-# #summarise the model
-# summary(fire_size_lm)
-```
 
 ### K Nearest Neighbor
 
+```{r}
+#first we will use leave one out cross validation to determine the best number of neighbors to consider (k)
+
+#knn works by calculating euclidean distance between observations, so all inputs have to be numeric. Therefore, we have to do some pre-model data changes to our training and test sets
+
+#one-hot code training and test data
+dummy <- dummyVars(" ~ .", data = fire_modeling_df)
+knn_fire_train <- data.frame(predict(dummy, newdata = fire_train))
+knn_fire_test <- data.frame(predict(dummy, newdata = fire_test))
+
+#list possible number of nearest neighbors to be considered 
+allK = 1:50
+
+#create a vector of length 50 to save validation errors in future
+k_validation_error = rep(NA, 50)
+
+#YTrain is the true values for fire size on the training set 
+YTrain = knn_fire_train$fire_size
+
+#XTrain is the design matrix for training data
+XTrain =  knn_fire_train %>% 
+  select(-fire_size) %>% 
+  scale(center = T, scale = T)
+
+
+#YTest is the true value for fire_size on the test set
+YTest = knn_fire_test$fire_size
+
+#Xtest is the design matrix for test data
+XTest = knn_fire_test %>% 
+  select(-fire_size) %>% 
+  scale(center = TRUE, scale = TRUE)
+
+# For each number in allK, use LOOCV to find a validation error  
+for (i in allK){  
+  # Loop through different number of neighbors
+  # Predict on the left-out validation set
+  pred.Yval = knn.cv(train = XTrain, cl =YTrain, k = i) 
+  # Combine all validation errors
+  k_validation_error[i] = mean(pred.Yval != YTrain)
+}
+
+
+```
 
 ### Boosted Tree
 
@@ -325,7 +370,6 @@ RMSE(predictions_test_rf, fire_test$fire_size)
 
 what type of modeling will we do? we must try 4 types
 
-- multiple linear regression
 - K nearest Neighbor
 - neural network
 
