@@ -30,7 +30,13 @@ library(caret) #for cross validation
 library(class) #for knn
 library(gbm) #for boosted trees modeling
 library(randomForest) #for random forest modeling
-
+library(maptools)
+library(RColorBrewer)
+library(classInt)
+library(ggplot2)
+library(ggrepel)
+library(mapproj)
+library(viridis)
 
 #turns scientific notation off
 options(scipen = 100)
@@ -186,6 +192,69 @@ corrplot(cor_matrix, type = "upper", order = "hclust",
 #consider PCA on wind, PCA on hum, PCA on temp
 ```
 
+### Map of fires
+
+#### The spatial distribution of wildifres 
+
+```{r}
+us_wildfire_clean$class_fac = factor(us_wildfire_clean$fire_size_class, levels = c("A", "B", "C", "D", "E", "F", "G"))
+
+us <- map_data("world", 'usa')
+
+state <- map_data("state")
+ggplot() + 
+  geom_polygon(data=state, aes(x=long, y=lat, group=group), color = "white", fill = "grey") + 
+  geom_point(data = us_wildfire_clean, aes(x=longitude, y = latitude, color = class_fac)) +
+  scale_color_brewer(palette = "YlOrRd")+
+  ggtitle("US Wildfire Distribution")+
+  guides(color=guide_legend(title="Wild Fire Scale"))+
+  coord_map(projection = "sinusoidal", xlim=c(-120, -75), ylim = c(25, 50))
+```
+
+### When we divide it to three periods, we can see the wildfire risk has been growing in Western parts of the US.
+
+```{r}
+ggplot() + 
+  geom_polygon(data=state, aes(x=long, y=lat, group=group), color = "white", fill = "grey") + 
+  geom_point(data = us_wildfire_clean[which(us_wildfire_clean$wstation_byear < 1970),], aes(x=longitude, y = latitude, color = class_fac)) +
+  scale_color_brewer(palette = "YlOrRd")+
+  ggtitle("US Wildfire Distribution before 1970")+
+  guides(color=guide_legend(title="Wild Fire Scale"))+
+  coord_map(projection = "sinusoidal", xlim=c(-120, -75), ylim = c(25, 50))
+
+ggplot() + 
+  geom_polygon(data=state, aes(x=long, y=lat, group=group), color = "white", fill = "grey") + 
+  geom_point(data = us_wildfire_clean[which(us_wildfire_clean$wstation_byear >= 1970 & us_wildfire_clean$wstation_byear < 2000),], aes(x=longitude, y = latitude, color = class_fac)) +
+  scale_color_brewer(palette = "YlOrRd")+
+  ggtitle("US Wildfire Distribution 1970-2000")+
+  guides(color=guide_legend(title="Wild Fire Scale"))+
+  coord_map(projection = "sinusoidal", xlim=c(-120, -75), ylim = c(25, 50))
+
+ggplot() + 
+  geom_polygon(data=state, aes(x=long, y=lat, group=group), color = "white", fill = "grey") + 
+  geom_point(data = us_wildfire_clean[which(us_wildfire_clean$wstation_byear >= 200),], aes(x=longitude, y = latitude, color = class_fac)) +
+  scale_color_brewer(palette = "YlOrRd")+
+  ggtitle("US Wildfire Distribution after 2000")+
+  guides(color=guide_legend(title="Wild Fire Scale"))+
+  coord_map(projection = "sinusoidal", xlim=c(-120, -75), ylim = c(25, 50))
+```
+
+### Density graph?
+
+```{r}
+ggplot() + 
+  geom_density(data= us_wildfire_clean[which(us_wildfire_clean$wstation_byear <= 1970 & us_wildfire_clean$fire_size > 100),], aes(x = fire_size, y=..density..),
+               alpha=.3,
+               colour="dodgerblue", fill="dodgerblue") + 
+  geom_density(data= us_wildfire_clean[which(us_wildfire_clean$wstation_byear >= 1970 & us_wildfire_clean$fire_size > 100 & us_wildfire_clean$wstation_byear < 2000),], aes(x = fire_size, y=..density..),
+               alpha=.3,
+               colour="yellow3", fill="yellow3") + 
+  geom_density(data= us_wildfire_clean[which(us_wildfire_clean$wstation_byear >= 2000 & us_wildfire_clean$fire_size > 100),], aes(x = fire_size, y=..density..),
+               alpha=.3,
+                 colour="firebrick3", fill="firebrick3") + 
+  xlim(10000, 100000) + 
+  ggtitle("Wildfire Severeity")
+```
 ideas for graphs
   - map of fires
   - vegetation
