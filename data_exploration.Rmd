@@ -25,10 +25,9 @@ library(here) #simplifies file paths
 library(rsample) #used to split data
 library(janitor) #used to clean data names
 library(corrplot) #for correlation viz
-library(VIM) #for analyzing missing data
-library(missMDA) #f0r imputing missing data
-library(ggfortify)
-library(tidymodels) #used for modeling workflow (MAYBE)
+library(VIM) #for missing data viz
+library(missMDA) #for imputing missing data
+library(ggfortify) #for PCA viz
 library(caret) #for cross validation
 library(class) #for knn
 library(gbm) #for boosted trees modeling
@@ -253,7 +252,7 @@ aggr_plot <- aggr(us_wildfire_clean,
                   sortVars = TRUE, 
                   labels = names(us_wildfire_clean), 
                   cex.axis = .7, 
-                  gap = 1, 
+                  gap = 2, 
                   ylab = c("Histogram of missing data","Pattern"))
 ```
 
@@ -277,8 +276,14 @@ corrplot(cor_matrix, type = "upper", order = "hclust",
 
 ## Model Preparation
 
+### Splitting Data
+
+We split our data into 80% training and 20% testing data. Because fire size is heavily skewed towards smaller fires, we used stratified sampling.
+
+There are xyz observations in the training set and xyz observations in the test set.
+
 ```{r}
-#first we make a dataframe containing only variables we want to use to predict
+#first we make a dataframe containing only variables we want to use in our models
 fire_modeling_df <- us_wildfire_clean %>%
   dplyr::select(-fire_name, #remove fire name
          -fire_size_class, #remove fire size class
@@ -288,31 +293,8 @@ fire_modeling_df <- us_wildfire_clean %>%
          -wstation_eyear, #remove station year ended data recording
          -weather_file, #remove name of weather file
          -dstation_m, #remove distance of weather station to fire
-         -disc_clean_date,
-         -cont_clean_date,
-         -disc_date_final,
-         -cont_date_final,
-         -putout_time
+         -vegetation #remove vegetaiton because we already have it classed
          )
-
-#select weather cols     
-weather <- fire_modeling_df %>% 
-  select(temp_pre_30:prec_cont)
-
-#select cols not in weather
-notweather <- fire_modeling_df %>% 
-  select(-colnames(weather)) 
-
-#Imputation before PCA
-fire_imputed <- imputePCA(weather, ncp=4)
-
-#bind imputed data to fire data
-fire_complete <- cbind(notweather, fire_imputed$completeObs)
-
-#one-hot code data
-dummy <- dummyVars(" ~ .", data = fire_complete)
-fire_one_hot <- data.frame(predict(dummy, newdata = fire_complete)) %>% 
-   scale(center = T, scale = T)
 
 #define split parameters
 us_wildfire_split <- fire_modeling_df %>% 
@@ -324,34 +306,74 @@ fire_test <- testing(us_wildfire_split)
 
 #set up folds in training data for cross validation
 train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
-
 ```
 
+### Imputing Missing Data
 
 ```{r}
-#A PCA can be performed on the imputed data 
-weather_PCA <- weather_imp$completeObs %>% 
-  scale(center = T, scale = T) %>% #first scale and center the data
-  prcomp() #do PCA
+#select weather cols     
+weather_train <- fire_train %>%
+  select(temp_pre_30:prec_cont)
+
+weather_test <- fire_test %>%
+  select(temp_pre_30:prec_cont)
+
+#select cols not in weather
+notweather_train <- fire_train %>%
+  select(-colnames(weather_train))
+
+notweather_test <- fire_test %>%
+  select(-colnames(weather_test))
+
+#imputation of weather data
+weather_train_imputed <- imputePCA(weather_train, ncp=4)
+
+
+weather_test_imputed <- imputePCA(weather_test, ncp=4)
+```
+
+### Principle Components
+
+```{r}
+#Do PCA on both test and train data separately
+weather_train_PCA <- weather_train_imputed$completeObs %>%
+  scale(center = T, scale = T) %>%  #first scale and center the data
+  prcomp(rank. = 4) #do PCA
+
+weather_train_PCA$x
+#Do PCA on both test and train data separately
+weather_test_PCA <- weather_test_imputed$completeObs %>%
+  scale(center = T, scale = T) %>%  #first scale and center the data
+  prcomp()
 
 #Make a PCA bi-plot
-autoplot(weather_PCA, 
-         data = weather,
+autoplot(weather_train_PCA, 
+         data = weather_train,
          loadings = TRUE, 
          loadings.label = TRUE,
          loadings.label.hjust = 1.2) +
   theme_classic() +
-  labs(caption = "Principle Component Analysis Bi-plot of Weather Data")
+  labs(caption = "Principle Component Analysis Bi-plot of Weather Training Data")
+
+#put data back together
+
+#bind imputed weather data to rest of rows
+fire_train_complete <- cbind(notweather_train, weather_train_PCA$x) %>% 
+  na.omit()
+
+fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>% 
+  na.omit()
 ```
 
-
-We split our data into 80% training and 20% testing data. Because fire size is heavily skewed towards smaller fires, we used stratified sampling.
-
-There are xyz observations in the training set and xyz observations in the test set.
+### One-Hot Coding
 
 ```{r}
-
+#one-hot code data (not working)
+# dummy_train <- dummyVars(" ~ .", data = fire_train_complete)
+# fire_train_dummy <- data.frame(predict(dummy_train, newdata = fire_train_complete)) %>% 
+#    scale(center = T, scale = T)
 ```
+
 
 ## Modeling As a Regression Problem
 
@@ -377,7 +399,6 @@ YTrain = knn_fire_train$fire_size
 XTrain =  knn_fire_train %>% 
   select(-fire_size) %>% 
  
-
 
 #YTest is the true value for fire_size on the test set
 YTest = knn_fire_test$fire_size
