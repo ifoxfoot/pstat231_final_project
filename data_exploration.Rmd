@@ -344,7 +344,7 @@ weather_train_PCA$x
 #Do PCA on both test and train data separately
 weather_test_PCA <- weather_test_imputed$completeObs %>%
   scale(center = T, scale = T) %>%  #first scale and center the data
-  prcomp()
+  prcomp(rank. = 4)
 
 #Make a PCA bi-plot
 autoplot(weather_train_PCA, 
