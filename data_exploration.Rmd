@@ -25,7 +25,9 @@ library(here) #simplifies file paths
 library(rsample) #used to split data
 library(janitor) #used to clean data names
 library(corrplot) #for correlation viz
-library(tidymodels) #used for modeling workflow (MAYBE)
+library(VIM) #for missing data viz
+library(missMDA) #for imputing missing data
+library(ggfortify) #for PCA viz
 library(caret) #for cross validation
 library(class) #for knn
 library(gbm) #for boosted trees modeling
@@ -76,9 +78,6 @@ A complete codebook is available in the project file
 ```{r}
 #read in dataset
 us_wildfire <- read_csv(here("archive", "FW_Veg_Rem_Combined.csv"))
-
-#have a peak at the data
-glimpse(us_wildfire, 5)
 ```
 
 # Methods
@@ -115,9 +114,18 @@ us_wildfire_clean <- us_wildfire_clean %>%
 #There are some weather observations for which every weather field is 0. this seems unlikely. so we will replace them with NA
 us_wildfire_clean <- us_wildfire_clean %>%
   mutate_at(vars(temp_pre_30:hum_cont), ~na_if(., 0.0000000))
+#precipitation is frequently zero, so we will not replace all zeros with NAs. Instead we will follow the pattern of NAs seen in other weather columns.
 
-#NOTE consider imputing missing data
-  
+#we can see that there is a clear pattern in the missing weather data. when temp_pre_30 is missing, so is wind_pre_30 and humidity_pre_30. We will assume this extends to precipitation
+us_wildfire_clean <- us_wildfire_clean %>% 
+  mutate(prec_pre_30 = case_when(is.na(temp_pre_30) & is.na(hum_pre_30) & is.na(wind_pre_30) ~ NA_real_,
+                                      TRUE ~ prec_pre_30)) %>% 
+  mutate(prec_pre_15 = case_when(is.na(temp_pre_15) & is.na(hum_pre_15) & is.na(wind_pre_15) ~ NA_real_,
+                                      TRUE ~ prec_pre_15)) %>% 
+  mutate(prec_pre_7 = case_when(is.na(temp_pre_7) & is.na(hum_pre_7) & is.na(wind_pre_7) ~ NA_real_,
+                                      TRUE ~ prec_pre_7)) %>% 
+  mutate(prec_cont = case_when(is.na(temp_cont) & is.na(hum_cont) & is.na(wind_cont) ~ NA_real_,
+                                      TRUE ~ prec_cont))
 
 #there are multiple date columns. however, since full dates are mostly missing, we will only keep month and year as variables
 us_wildfire_clean <- us_wildfire_clean %>% 
@@ -152,10 +160,6 @@ ggplot(data = acres_per_year) +
   theme_minimal() +
   theme(legend.position = "none")
 
-#remoteness (unfinalized)
-ggplot(data = us_wildfire_clean) +
-  geom_point(aes(x = remoteness, y = fire_size))
-
 #most common causes of fire
 fire_causes <- us_wildfire_clean %>% 
   group_by(stat_cause_descr) %>% 
@@ -171,25 +175,7 @@ ggplot(data = fire_causes, aes(y = reorder(stat_cause_descr, n), x = n)) +
   theme_minimal() +
   theme(legend.position = "none")
 
-#distribution of fire size  
-ggplot(data = us_wildfire_clean, aes(x = fire_size)) +  
-  geom_histogram(bins = 100)
 
-#It is likely that weather columns are correlated. to investigate this we create a correlation matrix
-
-#create a dataframe of weather
-weather <- us_wildfire_clean %>% 
-  dplyr::select(temp_pre_30:prec_cont)
-
-#create a correlation matrix (omitting NAs)
-cor_matrix <- cor(weather, use = "complete.obs")
-
-#create a visualization
-corrplot(cor_matrix, type = "upper", order = "hclust", 
-         tl.col = "black", tl.srt = 45)
-#we can see that their is a strong correlation with each set of variables. i.e. temperature 7 days before the fire is correlated with temp 30 days before the fire. 
-
-#consider PCA on wind, PCA on hum, PCA on temp
 ```
 
 ### Map of fires
@@ -255,19 +241,49 @@ ggplot() +
   xlim(10000, 100000) + 
   ggtitle("Wildfire Severeity")
 ```
-ideas for graphs
-  - map of fires
-  - vegetation
-  - weather conditions
+
+# Exploring Missing Data and Correlation
+
+```{r}
+#missing data plot
+aggr_plot <- aggr(us_wildfire_clean, 
+                  col = c('navyblue','red'), 
+                  numbers = TRUE, 
+                  sortVars = TRUE, 
+                  labels = names(us_wildfire_clean), 
+                  cex.axis = .7, 
+                  gap = 2, 
+                  ylab = c("Histogram of missing data","Pattern"))
+```
+
+```{r}
+#It is likely that weather columns are correlated. to investigate this we create a correlation matrix
+
+#create a dataframe of weather
+weather <- us_wildfire_clean %>% 
+  dplyr::select(temp_pre_30:prec_cont)
+
+#create a correlation matrix (omitting NAs)
+cor_matrix <- cor(weather, use = "complete.obs")
+
+#create a visualization
+corrplot(cor_matrix, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+#we can see that their is a strong correlation with each set of variables. i.e. temperature 7 days before the fire is correlated with temp 30 days before the fire. 
+
+#consider PCA on wind, PCA on hum, PCA on temp
+```
 
 ## Model Preparation
+
+### Splitting Data
 
 We split our data into 80% training and 20% testing data. Because fire size is heavily skewed towards smaller fires, we used stratified sampling.
 
 There are xyz observations in the training set and xyz observations in the test set.
 
 ```{r}
-#first we make a dataframe containing only variables we want to use to predict
+#first we make a dataframe containing only variables we want to use in our models
 fire_modeling_df <- us_wildfire_clean %>%
   dplyr::select(-fire_name, #remove fire name
          -fire_size_class, #remove fire size class
@@ -277,12 +293,9 @@ fire_modeling_df <- us_wildfire_clean %>%
          -wstation_eyear, #remove station year ended data recording
          -weather_file, #remove name of weather file
          -dstation_m, #remove distance of weather station to fire
-         -vegetation #remove because we have it classed in another col
-         ) %>% 
-  mutate_if(is.character, as.factor) %>% #turn all character cols into factors
-  mutate(disc_pre_year = as.factor(disc_pre_year)) %>% #turn year into factor
-  na.omit(.) #taking out all NAs.
-  
+         -vegetation #remove vegetaiton because we already have it classed
+         )
+
 #define split parameters
 us_wildfire_split <- fire_modeling_df %>% 
   initial_split(prop = 0.8, strata = "fire_size")
@@ -295,29 +308,74 @@ fire_test <- testing(us_wildfire_split)
 train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
 ```
 
-## Modeling As a Regression Problem
+### Imputing Missing Data
 
 ```{r}
-#if we want to use tidy models workflow
+#select weather cols     
+weather_train <- fire_train %>%
+  select(temp_pre_30:prec_cont)
 
-#set up a recipe for modeling NOT WORKING YET
-regression_recipe <- recipe(
-  #set up formuala to use
-  fire_size ~ .,
-  #specify use of training data
-  data = fire_train,
-  #One_hot encode all nominal predictors (dummy code them)
-  step_dummy(stat_cause_descr,
-             state,
-             discovery_month,
-             disc_pre_year,
-             vegetation_classed, 
-             one_hot = T) %>% 
-  #scale numeric predictors
-  step_center(all_predictors()) %>% 
-  step_scale(all_predictors())
-  )
+weather_test <- fire_test %>%
+  select(temp_pre_30:prec_cont)
+
+#select cols not in weather
+notweather_train <- fire_train %>%
+  select(-colnames(weather_train))
+
+notweather_test <- fire_test %>%
+  select(-colnames(weather_test))
+
+#imputation of weather data
+weather_train_imputed <- imputePCA(weather_train, ncp=4)
+
+
+weather_test_imputed <- imputePCA(weather_test, ncp=4)
 ```
+
+### Principle Components
+
+```{r}
+#Do PCA on both test and train data separately
+weather_train_PCA <- weather_train_imputed$completeObs %>%
+  scale(center = T, scale = T) %>%  #first scale and center the data
+  prcomp(rank. = 4) #do PCA
+
+weather_train_PCA$x
+#Do PCA on both test and train data separately
+weather_test_PCA <- weather_test_imputed$completeObs %>%
+  scale(center = T, scale = T) %>%  #first scale and center the data
+  prcomp(rank. = 4)
+
+#Make a PCA bi-plot
+autoplot(weather_train_PCA, 
+         data = weather_train,
+         loadings = TRUE, 
+         loadings.label = TRUE,
+         loadings.label.hjust = 1.2) +
+  theme_classic() +
+  labs(caption = "Principle Component Analysis Bi-plot of Weather Training Data")
+
+#put data back together
+
+#bind imputed weather data to rest of rows
+fire_train_complete <- cbind(notweather_train, weather_train_PCA$x) %>% 
+  na.omit()
+
+fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>% 
+  na.omit()
+```
+
+### One-Hot Coding
+
+```{r}
+#one-hot code data (not working)
+# dummy_train <- dummyVars(" ~ .", data = fire_train_complete)
+# fire_train_dummy <- data.frame(predict(dummy_train, newdata = fire_train_complete)) %>% 
+#    scale(center = T, scale = T)
+```
+
+
+## Modeling As a Regression Problem
 
 ### K Nearest Neighbor
 
@@ -326,10 +384,7 @@ regression_recipe <- recipe(
 
 #knn works by calculating euclidean distance between observations, so all inputs have to be numeric. Therefore, we have to do some pre-model data changes to our training and test sets
 
-#one-hot code training and test data
-dummy <- dummyVars(" ~ .", data = fire_modeling_df)
-knn_fire_train <- data.frame(predict(dummy, newdata = fire_train))
-knn_fire_test <- data.frame(predict(dummy, newdata = fire_test))
+
 
 #list possible number of nearest neighbors to be considered 
 allK = 1:50
@@ -343,8 +398,7 @@ YTrain = knn_fire_train$fire_size
 #XTrain is the design matrix for training data
 XTrain =  knn_fire_train %>% 
   select(-fire_size) %>% 
-  scale(center = T, scale = T)
-
+ 
 
 #YTest is the true value for fire_size on the test set
 YTest = knn_fire_test$fire_size
