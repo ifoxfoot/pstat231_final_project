@@ -13,7 +13,7 @@ output:
     code_folding: hide #enables code folding
 ---
 
-```{r setup, include=T}
+```{r setup, include=T, message = FALSE}
 knitr::opts_chunk$set(
 	echo = TRUE,
 	message = FALSE,
@@ -78,6 +78,15 @@ A complete codebook is available in the project file
 ```{r}
 #read in dataset
 us_wildfire <- read_csv(here("archive", "FW_Veg_Rem_Combined.csv"))
+#Following to the National Geographic Education
+us_wildfire$region = "NorthEast"
+us_wildfire[which(us_wildfire$state %in% c("AK", "WA", "OR", "CA", "NV", "ID", "MT", "WY", "UT", "CO")),"region"] = "West"
+us_wildfire[which(us_wildfire$state %in% c("AZ", "NM", "TX", "OK")), "region"] = "SouthWest"
+us_wildfire[which(us_wildfire$state %in% c("ND", "SD", "NE", "KS", "MN", "IA", "MO", "WI", "IL", "MI", "IN", "OH")), "region"] = "MidWest"
+us_wildfire[which(us_wildfire$state %in% c("AR", "LA", "MS", "AL", "GA", "FL", "SC", "NC", "TN", "KY", "VA", "WV")), "region"] = "SouthEast"
+
+us_wildfire$year_diff = us_wildfire$disc_pre_year - min(us_wildfire$disc_pre_year)
+
 ```
 
 # Methods
@@ -91,7 +100,7 @@ what we did to clean the data
 ```{r}
 #First, there are a couple of junk columns in the data, so we select only the columns that mean something, then we use janitor's clean names function for lowercase snake col names
 us_wildfire_clean <- us_wildfire %>% 
-  dplyr::select(fire_name:remoteness) %>% 
+  dplyr::select(fire_name:year_diff) %>% 
   clean_names()
 
 #we are interested in using weather to predict fire duration, so we filter out observations that do not have a weather file
@@ -178,9 +187,7 @@ ggplot(data = fire_causes, aes(y = reorder(stat_cause_descr, n), x = n)) +
 
 ```
 
-### Map of fires
-
-#### The spatial distribution of wildifres 
+### Map of regions
 
 ```{r}
 us_wildfire_clean$class_fac = factor(us_wildfire_clean$fire_size_class, levels = c("A", "B", "C", "D", "E", "F", "G"))
@@ -188,6 +195,27 @@ us_wildfire_clean$class_fac = factor(us_wildfire_clean$fire_size_class, levels =
 us <- map_data("world", 'usa')
 
 state <- map_data("state")
+
+state$region2 = "NorthEast"
+state[which(state$region %in% c("alaska", "washington", "oregon", "california", "nevada", "idaho", "montana", "utah", "wyoming", "colorado")), "region2"] = "West"
+state[which(state$region %in% c("arizona", "new mexico", "oklahoma", "texas")), "region2"] = "SouthWest"
+state[which(state$region %in% c("north dakota", "south dakota", "nebraska", "kansas", "minnesota", "iowa", "missouri", "wisconsin", "illinois", "indiana", "michigan", "ohio")), "region2"] = "MidWest"
+state[which(state$region %in% c("arkansas", "louisiana", "mississippi", "alabama", "florida", "georgia", "south carolina", "north carolina", "tennessee", "kentucky", "virginia", "west virginia")), "region2"] = "SouthEast"
+
+#state$region = as.factor(state$region)
+
+ggplot(data=state, aes(x=long, y=lat, group = region)) + 
+  geom_polygon(aes(fill=region2)) +
+  ggtitle("US Region")+
+  guides(fill=guide_legend(title="Region"))+
+  coord_map(projection = "sinusoidal", xlim=c(-120, -75), ylim = c(25, 50))
+```
+
+### Map of fires
+
+#### The spatial distribution of wildifres 
+
+```{r}
 ggplot() + 
   geom_polygon(data=state, aes(x=long, y=lat, group=group), color = "white", fill = "grey") + 
   geom_point(data = us_wildfire_clean, aes(x=longitude, y = latitude, color = class_fac)) +
@@ -225,7 +253,7 @@ ggplot() +
   coord_map(projection = "sinusoidal", xlim=c(-120, -75), ylim = c(25, 50))
 ```
 
-### Density graph?
+### Density graph
 
 ```{r}
 ggplot() + 
@@ -308,6 +336,7 @@ fire_test <- testing(us_wildfire_split)
 train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
 ```
 
+
 ### Imputing Missing Data
 
 ```{r}
@@ -332,13 +361,18 @@ weather_train_imputed <- imputePCA(weather_train, ncp=4)
 weather_test_imputed <- imputePCA(weather_test, ncp=4)
 ```
 
-### Principle Components Analysis
+
+### Principle Components
+
 
 ```{r}
 #Do PCA on both test and train data separately
 weather_train_PCA <- weather_train_imputed$completeObs %>%
   scale(center = T, scale = T) %>%  #first scale and center the data
   prcomp(rank. = 4) #do PCA
+
+
+#weather_train_PCA$x
 
 #Do PCA on both test and train data separately
 weather_test_PCA <- weather_test_imputed$completeObs %>%
@@ -364,6 +398,24 @@ fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>%
   na.omit()
 ```
 
+
+### Linear regression for each region
+
+```{r}
+summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete))
+
+summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "SouthWest"),]))
+
+summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "SouthEast"),]))
+
+summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "MidWest"),]))
+
+summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "West"),]))
+
+summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "NorthEast"),]))
+
+```
+
 ### One-Hot Coding
 
 ```{r}
@@ -378,7 +430,7 @@ fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>%
 
 ### K Nearest Neighbor
 
-```{r}
+```{r, eval = FALSE}
 #first we will use leave one out cross validation to determine the best number of neighbors to consider (k)
 
 #knn works by calculating euclidean distance between observations, so all inputs have to be numeric. Therefore, we have to do some pre-model data changes to our training and test sets
@@ -421,7 +473,7 @@ for (i in allK){
 
 ### Boosted Tree
 
-```{r}
+```{r, eval = FALSE}
 #train boosted tree model
 fire_size_boost = gbm(fire_size~., 
                       data = fire_train,
@@ -451,7 +503,7 @@ RMSE(predictions_test_boost, fire_test$fire_size)
 
 ### Random Forest
 
-```{r}
+```{r, eval = FALSE}
 #train model
 fire_size_rf = randomForest(fire_size ~ ., #writing the formula
                           data = fire_train_complete, #specifying training data to be used
