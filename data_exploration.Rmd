@@ -28,6 +28,7 @@ library(corrplot) #for correlation viz
 library(VIM) #for missing data viz
 library(missMDA) #for imputing missing data
 library(ggfortify) #for PCA viz
+library(fastDummies) #for dummy coding
 library(caret) #for cross validation
 library(class) #for knn
 library(gbm) #for boosted trees modeling
@@ -145,6 +146,14 @@ us_wildfire_clean <- us_wildfire_clean %>%
          -disc_date_final,
          -cont_date_final,
          -putout_time)
+
+#we also can reclass months into seasons, to reduce factor levels
+us_wildfire_clean <- us_wildfire_clean %>% 
+  mutate(season = case_when(discovery_month %in% c("Apr", "May", "Jun") ~ "Spring",
+                            discovery_month %in% c("Jul", "Aug", "Sep") ~ "Summer",
+                            discovery_month %in% c("Oct", "Nov", "Dec") ~ "Fall",
+                            discovery_month %in% c("Jan", "Feb", "Mar") ~ "Winter")) %>% 
+  select(-discovery_month)
 ```
 
 ## Exploratory Analysis
@@ -315,6 +324,9 @@ There are xyz observations in the training set and xyz observations in the test 
 fire_modeling_df <- us_wildfire_clean %>%
   dplyr::select(-fire_name, #remove fire name
          -fire_size_class, #remove fire size class
+         -class_fac, #which is also a size class
+         -state, #because we have regions
+         -disc_pre_year, #because we have year_diff to represent year
          -wstation_usaf, #remove weather station name
          -wstation_wban, #remove this (not described in codebook)
          -wstation_byear, #remove station year installed
@@ -361,9 +373,7 @@ weather_train_imputed <- imputePCA(weather_train, ncp=4)
 weather_test_imputed <- imputePCA(weather_test, ncp=4)
 ```
 
-
 ### Principle Components
-
 
 ```{r}
 #Do PCA on both test and train data separately
@@ -416,26 +426,32 @@ summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_comp
 
 ```
 
-### One-Hot Coding
-
-```{r}
-#one-hot code data (not working)
-# dummy_train <- dummyVars(" ~ .", data = fire_train_complete)
-# fire_train_dummy <- data.frame(predict(dummy_train, newdata = fire_train_complete)) %>% 
-#    scale(center = T, scale = T)
-```
 
 
 ## Modeling As a Regression Problem
 
 ### K Nearest Neighbor
+```{r}
+#knn works by calculating euclidean distance between observations, so all inputs have to be numeric. Therefore, we have to do some pre-model data changes to our training and test sets
+
+#first we dummy code categorical variables (what about ordinal?)
+knn_ready_train <- dummy_cols(fire_train_complete, select_columns = c("stat_cause_descr", "region", "vegetation_classed", "season")) %>% 
+  #then we get rid of non-dummy coded variables
+  select(-stat_cause_descr, - region, - vegetation_classed, -season) %>% 
+  #then we center and scale the data
+  scale(center = T, scale = T) %>% 
+  #then convert back to a dataframe (as output for `dummy_cols` is a matrix)
+  as.data.frame()
+
+#of course our next step is to do the same to the test data
+knn_ready_test <- dummy_cols(fire_test_complete, select_columns = c("stat_cause_descr", "region", "vegetation_classed", "season")) %>% 
+  select(-stat_cause_descr, - region, - vegetation_classed, -season) %>% 
+  scale(center = T, scale = T) %>% 
+  as.data.frame()
+```
 
 ```{r, eval = FALSE}
 #first we will use leave one out cross validation to determine the best number of neighbors to consider (k)
-
-#knn works by calculating euclidean distance between observations, so all inputs have to be numeric. Therefore, we have to do some pre-model data changes to our training and test sets
-
-
 
 #list possible number of nearest neighbors to be considered 
 allK = 1:50
@@ -444,18 +460,18 @@ allK = 1:50
 k_validation_error = rep(NA, 50)
 
 #YTrain is the true values for fire size on the training set 
-YTrain = knn_fire_train$fire_size
+YTrain = knn_ready_train$fire_size
 
 #XTrain is the design matrix for training data
-XTrain =  knn_fire_train %>% 
-  select(-fire_size) %>% 
+XTrain =  knn_ready_train %>% 
+  select(-fire_size)
  
 
 #YTest is the true value for fire_size on the test set
-YTest = knn_fire_test$fire_size
+YTest = knn_ready_test$fire_size
 
 #Xtest is the design matrix for test data
-XTest = knn_fire_test %>% 
+XTest = knn_ready_test %>% 
   select(-fire_size) %>% 
   scale(center = TRUE, scale = TRUE)
 
