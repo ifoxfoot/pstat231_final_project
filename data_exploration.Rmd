@@ -423,18 +423,23 @@ fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>%
 ### Linear regression for each region
 
 ```{r}
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete))
+lm_whole = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete)
+summary(lm_whole)
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "SouthWest"),]))
+lm_sw = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "SouthWest"),])
+summary(lm_sw)
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "SouthEast"),]))
+lm_se = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "SouthEast"),])
+summary(lm_se)
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "MidWest"),]))
+lm_me = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "MidWest"),])
+summary(lm_me)
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "West"),]))
+lm_w = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "West"),])
+summary(lm_w)
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "NorthEast"),]))
-
+lm_ne = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "NorthEast"),])
+summary(lm_ne)
 ```
 
 ### One-Hot Coding
