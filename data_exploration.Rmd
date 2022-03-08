@@ -332,7 +332,7 @@ weather_train_imputed <- imputePCA(weather_train, ncp=4)
 weather_test_imputed <- imputePCA(weather_test, ncp=4)
 ```
 
-### Principle Components
+### Principle Components Analysis
 
 ```{r}
 #Do PCA on both test and train data separately
@@ -340,7 +340,6 @@ weather_train_PCA <- weather_train_imputed$completeObs %>%
   scale(center = T, scale = T) %>%  #first scale and center the data
   prcomp(rank. = 4) #do PCA
 
-weather_train_PCA$x
 #Do PCA on both test and train data separately
 weather_test_PCA <- weather_test_imputed$completeObs %>%
   scale(center = T, scale = T) %>%  #first scale and center the data
@@ -455,7 +454,7 @@ RMSE(predictions_test_boost, fire_test$fire_size)
 ```{r}
 #train model
 fire_size_rf = randomForest(fire_size ~ ., #writing the formula
-                          data = fire_train, #specifying training data to be used
+                          data = fire_train_complete, #specifying training data to be used
                           mtry = 9, #setting number of variables to randomly sample per each split
                           ntree= 500, #setting number of trees
                           mode = "regression", #specifying regression
@@ -490,7 +489,6 @@ RMSE(predictions_test_rf, fire_test$fire_size)
 
 what type of modeling will we do? we must try 4 types
 
-- K nearest Neighbor
 - neural network
 
 # Results
