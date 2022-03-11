@@ -449,14 +449,8 @@ knn_ready_test <- dummy_cols(fire_test_complete, select_columns = c("stat_cause_
   as.data.frame()
 ```
 
-```{r, eval = FALSE}
+```{r, eval = F}
 #first we will use leave one out cross validation to determine the best number of neighbors to consider (k)
-
-#list possible number of nearest neighbors to be considered 
-allK = 1:100
-
-#create a vector of length 50 to save validation errors in future
-k_mse = rep(NA, 100)
 
 #YTrain is the true values for fire size on the training set 
 YTrain = knn_ready_train$fire_size
@@ -465,13 +459,22 @@ YTrain = knn_ready_train$fire_size
 XTrain =  knn_ready_train %>% 
   select(-fire_size)
  
-
 #YTest is the true value for fire_size on the test set
 YTest = knn_ready_test$fire_size
 
 #Xtest is the design matrix for test data
 XTest = knn_ready_test %>% 
   select(-fire_size)
+
+#make a function that saves KNN LOOCV results for different values of K
+knn_loocv <- function(startk, endk, interval)
+  {
+  
+#list possible number of nearest neighbors to be considered 
+allK = seq(from = startk, to = endk, by = interval)
+
+#create a vector of length 50 to save validation errors in future
+k_mse = rep(NA, length(allK))
 
 # For each number in allK, use LOOCV to find a validation error  
 for (i in allK){  
@@ -482,7 +485,21 @@ for (i in allK){
   k_mse[i] = mean((as.numeric(pred.Yval) - YTrain)^2)
 }
 
-#plot MSEfor values of k
+#save as a data frame and filter out NAs (caused by skipping values of k if interval is larger than 1)
+k_mse <- as.data.frame(k_mse) %>% 
+  filter(!is.na(k_mse))
+
+#bind with k value
+knn_loocv_results <- cbind(as.data.frame(allK), k_mse)
+
+#save MSE as CSV (because the cross validation process takes a long time)
+write_csv(knn_loocv_results, paste0("model_results/knn/knn_mse_k", startk,"_k", endk, "_by", interval, ".csv"), append = TRUE)
+
+}
+
+knn_loocv(startk = 1, endk = 5, interval = 1)
+
+#plot MSE for values of k
 plot(allK, k_mse, type = "l", xlab = "k")
 
 #Best number of neighbors
@@ -492,24 +509,14 @@ numneighbor
 #fit KNN model with best neighbor value to test data
 pred.YTest = knn(train=XTrain, test=XTest, cl=YTrain, k=numneighbor)
 
-
-pred.YTest = knn(train=XTrain, test=XTest, cl=YTrain, k=1000)
-
 #predict KNN
 test_MSE <- mean((as.numeric(pred.YTest) - YTest)^2)
-test_MSE
-#-------------------------------------------------------------------------------
 
-# knn_ready_train
-# 
-# train.control <- trainControl(method  = "LOOCV")
-# 
-# knn <- train(fire_size~ .,
-#              method     = "knn",
-#              tuneGrid   = expand.grid(k = 1:50),
-#              trControl  = train.control,
-#              metric     = "Accuracy",
-#              data       = cbind(V1 = as.factor(knn_ready_train[,1]), knn_ready_train_n))
+#getting test MSE
+test_MSE
+
+#getting test RMSE
+sqrt(test_MSE)
 ```
 
 ### Boosted Tree
