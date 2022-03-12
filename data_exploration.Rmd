@@ -279,7 +279,7 @@ ggplot() +
   ggtitle("Wildfire Severeity")
 ```
 
-# Exploring Missing Data and Correlation
+### Exploring Missing Data and Correlation
 
 ```{r}
 #missing data plot
@@ -308,7 +308,6 @@ corrplot(cor_matrix, type = "upper", order = "hclust",
          tl.col = "black", tl.srt = 45)
 #we can see that their is a strong correlation with each set of variables. i.e. temperature 7 days before the fire is correlated with temp 30 days before the fire. 
 
-#consider PCA on wind, PCA on hum, PCA on temp
 ```
 
 ## Model Preparation
@@ -408,6 +407,7 @@ fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>%
   na.omit()
 ```
 
+## Modeling As a Regression Problem
 
 ### Linear regression for each region
 
@@ -426,8 +426,6 @@ summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_comp
 
 ```
 
-
-## Modeling As a Regression Problem
 
 ### K Nearest Neighbor
 
