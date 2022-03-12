@@ -1,6 +1,6 @@
 ---
-title: "Wildfire Exploration"
-author: "Iris Foxfoot"
+title: "Predicting Wildfire Size"
+author: "Iris Foxfoot, Seonga Cho, Vanessa"
 date: "2/3/2022"
 output: 
   html_document:
@@ -430,28 +430,36 @@ summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_comp
 ## Modeling As a Regression Problem
 
 ### K Nearest Neighbor
-```{r}
-#knn works by calculating euclidean distance between observations, so all inputs have to be numeric. Therefore, we have to do some pre-model data changes to our training and test sets
 
+KNN (short for K Nearest Neighbor) is a non-linear algorithm that works for both classification and regression problems. The basic premise behind the model is that it predicts the dependent variable based on how similar they are to other observations where the dependent variable is known. 
+
+KNN works by calculating euclidean distance between observations, so all inputs have to be numeric. Therefore, we have to do some pre-model data changes to our training and test sets. For both test data and training data we dummy code categorical variables, then we center and scale the data. As before, we assume that the training and test data are completely separated, so we process the two data sets separately.
+
+```{r}
 #first we dummy code categorical variables (what about ordinal?)
-knn_ready_train <- dummy_cols(fire_train_complete, select_columns = c("stat_cause_descr", "region", "vegetation_classed", "season")) %>% 
+knn_ready_train <- dummy_cols(fire_train_complete, select_columns = 
+                                c("stat_cause_descr", "region", "vegetation_classed", "season")) %>% 
   #then we get rid of non-dummy coded variables
   select(-stat_cause_descr, - region, - vegetation_classed, -season) %>% 
-  #then we center and scale the data
-  scale(center = T, scale = T) %>% 
-  #then convert back to a dataframe (as output for `dummy_cols` is a matrix)
+  #then convert back to a data frame (as output for `dummy_cols` is a matrix)
   as.data.frame()
+
+#then we center and scale the data, except our outcome
+knn_ready_train[,-1] <- scale(knn_ready_train[,-1], center = T, scale = T)
+
 
 #of course our next step is to do the same to the test data
-knn_ready_test <- dummy_cols(fire_test_complete, select_columns = c("stat_cause_descr", "region", "vegetation_classed", "season")) %>% 
+knn_ready_test <- dummy_cols(fire_test_complete, 
+                             select_columns = c("stat_cause_descr", "region", "vegetation_classed", "season")) %>% 
   select(-stat_cause_descr, - region, - vegetation_classed, -season) %>% 
-  scale(center = T, scale = T) %>% 
   as.data.frame()
+
+knn_ready_test[,-1] <- scale(knn_ready_test[,-1], center = T, scale = T)
 ```
 
-```{r, eval = F}
-#first we will use leave one out cross validation to determine the best number of neighbors to consider (k)
+Next we split up the training and test data into a data frame that has only independent variables and a data frame that has only dependent variables (in this case `fire_size`). We do this for both the test and the training data. 
 
+```{r}
 #YTrain is the true values for fire size on the training set 
 YTrain = knn_ready_train$fire_size
 
@@ -465,23 +473,27 @@ YTest = knn_ready_test$fire_size
 #Xtest is the design matrix for test data
 XTest = knn_ready_test %>% 
   select(-fire_size)
+```
 
+Then we use Leave One Out Cross Validation to determine the best number of neighbors to consider. A low number of neighbors considered results in a highly flexible model, while a higher number results in a less flexible model. For this process we built a function which we enter a starting value of K, an ending value of K, and the sampling interval. The result is a data frame of MSE values for each value of K that we test. This process is computationally intensive so we automatically saved results to a csv.
+
+```{r, eval = F}
 #make a function that saves KNN LOOCV results for different values of K
 knn_loocv <- function(startk, endk, interval)
   {
   
-#list possible number of nearest neighbors to be considered 
+#set up possible number of nearest neighbors to be considered 
 allK = seq(from = startk, to = endk, by = interval)
 
-#create a vector of length 50 to save validation errors in future
+#create a vector of the same length to save the MSE in later
 k_mse = rep(NA, length(allK))
 
-# For each number in allK, use LOOCV to find a validation error  
+#for each number in allK, use LOOCV to find a validation error  
 for (i in allK){  
-  # Loop through different number of neighbors
-  # Predict on the left-out validation set
+  #loop through different number of neighbors
+  #predict on the left-out validation set
   pred.Yval = knn.cv(train = XTrain, cl = YTrain, k = i) 
-  # Combine all validation errors
+  #find the mse for each value of k
   k_mse[i] = mean((as.numeric(pred.Yval) - YTrain)^2)
 }
 
@@ -493,31 +505,61 @@ k_mse <- as.data.frame(k_mse) %>%
 knn_loocv_results <- cbind(as.data.frame(allK), k_mse)
 
 #save MSE as CSV (because the cross validation process takes a long time)
-write_csv(knn_loocv_results, paste0("model_results/knn/knn_mse_k", startk,"_k", endk, "_by", interval, ".csv"), append = TRUE)
+write_csv(knn_loocv_results, paste0("model_results/knn/knn_mse_k", startk,"_k", endk, "_by", interval, ".csv"))
 
 }
 
-knn_loocv(startk = 1, endk = 5, interval = 1)
+#we tried several different sets of k
+knn_loocv(startk = 1, endk = 20, interval = 1)
+knn_loocv(startk = 1, endk = 500, interval = 20)
+knn_loocv(startk = 481, endk = 490, interval = 1)
+```
+
+Next, we go through our results for all the values of K that we tested. We find that the MSE increases as K increases.
+
+```{r}
+#read in all the stored k values
+knn_mse_k1_k500_by20 <- read_csv(here("model_results", "knn", "knn_mse_k1_k500_by20.csv"))
+
+knn_mse_k1_k20_by1 <- read_csv(here("model_results", "knn", "knn_mse_k1_k20_by1.csv"))
 
 #plot MSE for values of k
-plot(allK, k_mse, type = "l", xlab = "k")
+plot(knn_mse_k1_k500_by20$allK, knn_mse_k1_k500_by20$k_mse, type = "l", xlab = "k", ylab = "MSE", main = "MSE for K 1 through 500 at intervals of 20")
+```
 
-#Best number of neighbors
-numneighbor = max(allK[k_mse == min(k_mse)]) 
+When we look at K 1-20 we get the lowest MSE at around 3 before it starts increasing. 
+
+```{r}
+plot(knn_mse_k1_k20_by1$allK, knn_mse_k1_k20_by1$k_mse, type = "l", xlab = "k", ylab = "MSE", main = "MSE for K 1 through 20 at intervals of 1")
+```
+
+Just to confirm, we will print out the best number of neighbors.
+
+```{r}
+#best number of neighbors
+numneighbor = max(knn_mse_k1_k20_by1$allK[knn_mse_k1_k20_by1$k_mse == min(knn_mse_k1_k20_by1$k_mse)])
+
+#print best number of neighbors
 numneighbor
+```
 
+Now that we've found the best number of nearest neighbors to consider, we try out KNN on our test data! Below is the test MSE and the test RMSE.
+
+```{r}
 #fit KNN model with best neighbor value to test data
-pred.YTest = knn(train=XTrain, test=XTest, cl=YTrain, k=numneighbor)
+pred.YTest = knn(train = XTrain, test = XTest, cl = YTrain, k = numneighbor)
 
 #predict KNN
 test_MSE <- mean((as.numeric(pred.YTest) - YTest)^2)
 
-#getting test MSE
+#print test MSE
 test_MSE
 
-#getting test RMSE
+#print test RMSE
 sqrt(test_MSE)
 ```
+
+Over all, this model performs okay.
 
 ### Boosted Tree
 
