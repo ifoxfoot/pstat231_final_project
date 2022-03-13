@@ -510,7 +510,6 @@ write_csv(knn_loocv_results, paste0("model_results/knn/knn_mse_k", startk,"_k", 
 #we tried several different sets of k
 knn_loocv(startk = 1, endk = 20, interval = 1)
 knn_loocv(startk = 1, endk = 500, interval = 20)
-knn_loocv(startk = 481, endk = 490, interval = 1)
 ```
 
 Next, we go through our results for all the values of K that we tested. We find that the MSE increases as K increases.
