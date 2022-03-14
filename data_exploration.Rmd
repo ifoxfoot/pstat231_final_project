@@ -524,7 +524,7 @@ knn_mse_k1_k20_by1 <- read_csv(here("model_results", "knn", "knn_mse_k1_k20_by1.
 plot(knn_mse_k1_k500_by20$allK, knn_mse_k1_k500_by20$k_mse, type = "l", xlab = "k", ylab = "MSE", main = "MSE for K 1 through 500 at intervals of 20")
 ```
 
-When we look at K 1-20 we get the lowest MSE at around 3 before it starts increasing. 
+When we look at K 1-20 we get the lowest MSE at around 3 before it starts increasing.
 
 ```{r}
 plot(knn_mse_k1_k20_by1$allK, knn_mse_k1_k20_by1$k_mse, type = "l", xlab = "k", ylab = "MSE", main = "MSE for K 1 through 20 at intervals of 1")
