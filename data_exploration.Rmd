@@ -93,22 +93,51 @@ us_wildfire$year_diff = us_wildfire$disc_pre_year - min(us_wildfire$disc_pre_yea
 
 # Methods
 
-Overview of methods
+Our methods involved cleaning the data, conducting exploratory analysis, imputing missing data, and using Principle Components Analysis to reduce the number of features.
 
 ## Cleaning Data
  
-what we did to clean the data
+To clean the data we first converted all column names to lower snake case using the `clean_names()` function. Then we selected only the columns were were interested in using, thereby removing all the meaningless columns.
 
 ```{r}
-#First, there are a couple of junk columns in the data, so we select only the columns that mean something, then we use janitor's clean names function for lowercase snake col names
 us_wildfire_clean <- us_wildfire %>% 
-  dplyr::select(fire_name:year_diff) %>% 
-  clean_names()
+  dplyr::select(fire_name:year_diff) %>% #select columns we want to use
+  clean_names() #convert to lowercase snake
+```
 
-#we are interested in using weather to predict fire duration, so we filter out observations that do not have a weather file
+We are interested in using weather to predict fire size, so we filter out observations where the weather data was not associated with the fire observation. 
+
+There are some weather observations for which every weather field is 0. This seems unlikely, especially for temperature and humidity observations. So we will replace them with NAs. Since precipitation is frequently 0, we will not replace all 0 with NAs in the precipitation column. 
+
+Instead, we will follow the pattern of NAs seen in other the other weather columns. We can see that there is a clear pattern in the missing weather data. when `temp_pre_30` is missing, so is `wind_pre_30` and `humidity_pre_30`. We will assume this extends to `prec_pre_30` and replace that 0 with a NA.
+
+```{r}
+#filter out observations that do not have a weather file
 us_wildfire_clean <- us_wildfire_clean %>% 
   filter(weather_file != "File Not Found")
 
+#replace 0 with NA
+us_wildfire_clean <- us_wildfire_clean %>%
+  mutate_at(vars(temp_pre_30:hum_cont), ~na_if(., 0.0000000))
+
+#when temp, wind, and humidity are missing, we suspect precipitation is as well.
+#we use a case when statement to replace these zeros with NAs
+us_wildfire_clean <- us_wildfire_clean %>% 
+  mutate(prec_pre_30 = case_when(is.na(temp_pre_30) & is.na(hum_pre_30) & is.na(wind_pre_30) ~ NA_real_,
+                                      TRUE ~ prec_pre_30)) %>% 
+  mutate(prec_pre_15 = case_when(is.na(temp_pre_15) & is.na(hum_pre_15) & is.na(wind_pre_15) ~ NA_real_,
+                                      TRUE ~ prec_pre_15)) %>% 
+  mutate(prec_pre_7 = case_when(is.na(temp_pre_7) & is.na(hum_pre_7) & is.na(wind_pre_7) ~ NA_real_,
+                                      TRUE ~ prec_pre_7)) %>% 
+  mutate(prec_cont = case_when(is.na(temp_cont) & is.na(hum_cont) & is.na(wind_cont) ~ NA_real_,
+                                      TRUE ~ prec_cont))
+```
+
+Information about vegetation was stored in a numeric form, where each number represented a class of vegetation. The key for the vegetation codes was in the provided metadata. For ease of interpretation, we replaced the numeric code with a short description the vegetation type. 
+
+According the metadata for this data set, the vegetation was created by interpolating most likely vegetation based on latitude and longitude. The most common vegetation type is listed as "Polar Desert/Rock/Ice" and this seems very unlikely. Although we keep the vegetation feature in the data, we have doubts about its accuracy.
+
+```{r}
 #Here we label vegetation according to the provided codebook
 us_wildfire_clean <- us_wildfire_clean %>% 
   mutate(vegetation_classed = case_when(
@@ -119,26 +148,12 @@ us_wildfire_clean <- us_wildfire_clean %>%
     vegetation == 9 ~ "C3 Grassland/Steppe",
     vegetation == 14 ~ "Desert"
   ))
+```
 
-#According the metadata for this data set, the vegetation was created by interpolating most likely vegetation based on latitude and longitude. The most common vegetation type is listed as "Polar Desert/Rock/Ice" and this seems very unlikely.
+Our final data cleaning action was to clean up date columns. Since there are redundant date columns, we chose to keep only month and year as variables. We also reclassified months into seasons, so there would be fewer factor levels or dummy coding involved when it came time to prepare the data for modeling.
 
-#There are some weather observations for which every weather field is 0. this seems unlikely. so we will replace them with NA
-us_wildfire_clean <- us_wildfire_clean %>%
-  mutate_at(vars(temp_pre_30:hum_cont), ~na_if(., 0.0000000))
-#precipitation is frequently zero, so we will not replace all zeros with NAs. Instead we will follow the pattern of NAs seen in other weather columns.
-
-#we can see that there is a clear pattern in the missing weather data. when temp_pre_30 is missing, so is wind_pre_30 and humidity_pre_30. We will assume this extends to precipitation
-us_wildfire_clean <- us_wildfire_clean %>% 
-  mutate(prec_pre_30 = case_when(is.na(temp_pre_30) & is.na(hum_pre_30) & is.na(wind_pre_30) ~ NA_real_,
-                                      TRUE ~ prec_pre_30)) %>% 
-  mutate(prec_pre_15 = case_when(is.na(temp_pre_15) & is.na(hum_pre_15) & is.na(wind_pre_15) ~ NA_real_,
-                                      TRUE ~ prec_pre_15)) %>% 
-  mutate(prec_pre_7 = case_when(is.na(temp_pre_7) & is.na(hum_pre_7) & is.na(wind_pre_7) ~ NA_real_,
-                                      TRUE ~ prec_pre_7)) %>% 
-  mutate(prec_cont = case_when(is.na(temp_cont) & is.na(hum_cont) & is.na(wind_cont) ~ NA_real_,
-                                      TRUE ~ prec_cont))
-
-#there are multiple date columns. however, since full dates are mostly missing, we will only keep month and year as variables
+```{r}
+#keep month and year as variables
 us_wildfire_clean <- us_wildfire_clean %>% 
   dplyr::select(-disc_clean_date, 
          -disc_date_pre, 
@@ -148,7 +163,7 @@ us_wildfire_clean <- us_wildfire_clean %>%
          -cont_date_final,
          -putout_time)
 
-#we also can reclass months into seasons, to reduce factor levels
+#we also reclassify months into seasons, to reduce factor levels
 us_wildfire_clean <- us_wildfire_clean %>% 
   mutate(season = case_when(discovery_month %in% c("Apr", "May", "Jun") ~ "Spring",
                             discovery_month %in% c("Jul", "Aug", "Sep") ~ "Summer",
@@ -159,7 +174,9 @@ us_wildfire_clean <- us_wildfire_clean %>%
 
 ## Exploratory Analysis
 
-~ a few key graphs, exploring data
+Our next step was to explore the data. We created several figures to investigate fire observations, as well as the pattern of missing data and the correlation between variables.
+
+First we investigated fire size through time. This figure shows that the total acrage burned per year has been increasing almost linearly since 1990. This is a clue that `Year` might be a useful feature in our models. 
 
 ```{r}
 #summarise acres per year burned
@@ -178,7 +195,11 @@ ggplot(data = acres_per_year) +
        title = "Total acres burned per year from 1990 to 2015") +
   theme_minimal() +
   theme(legend.position = "none")
+```
 
+We also looked at the most common causes of fires. We found that most fires were started by debris burning, followed by arson. Yikes! We were also surprised that a children were frequently listed as the cause of wildfires.
+
+```{r}
 #most common causes of fire
 fire_causes <- us_wildfire_clean %>% 
   group_by(stat_cause_descr) %>% 
@@ -193,8 +214,6 @@ ggplot(data = fire_causes, aes(y = reorder(stat_cause_descr, n), x = n)) +
        tite = "Number of fires per listed starting cause") +
   theme_minimal() +
   theme(legend.position = "none")
-
-
 ```
 
 ### Map of regions
@@ -282,10 +301,12 @@ ggplot() +
 
 ### Exploring Missing Data and Correlation
 
+As part of our exploratory analysis, we we looked at the pattern of missing data. This figure shows missing data in red. You can see that most missing data is concentrated in the weather columns, and the name of the fire is also often missing. 
+
 ```{r}
 #missing data plot
 aggr_plot <- aggr(us_wildfire_clean, 
-                  col = c('navyblue','red'), 
+                  col = c('yellow','red'), 
                   numbers = TRUE, 
                   sortVars = TRUE, 
                   labels = names(us_wildfire_clean), 
@@ -294,9 +315,11 @@ aggr_plot <- aggr(us_wildfire_clean,
                   ylab = c("Histogram of missing data","Pattern"))
 ```
 
-```{r}
-#It is likely that weather columns are correlated. to investigate this we create a correlation matrix
+We hypothesized that weather variables were correlated. To test this out, we created a correlation matrix. 
 
+This figure shows that there is a strong correlation with each set of variables. I.e. the 7 day average temperature is correlated with the 30 day average temperature. This is not surprising!
+
+```{r}
 #create a dataframe of weather
 weather <- us_wildfire_clean %>% 
   dplyr::select(temp_pre_30:prec_cont)
@@ -307,20 +330,20 @@ cor_matrix <- cor(weather, use = "complete.obs")
 #create a visualization
 corrplot(cor_matrix, type = "upper", order = "hclust", 
          tl.col = "black", tl.srt = 45)
-#we can see that their is a strong correlation with each set of variables. i.e. temperature 7 days before the fire is correlated with temp 30 days before the fire. 
-
 ```
 
 ## Model Preparation
 
+After exploring our data, we were ready to prepare it for modeling. We first split the data into test and training data, then do some data manipulations separately on the test and training data.
+
 ### Splitting Data
 
-We split our data into 80% training and 20% testing data. Because fire size is heavily skewed towards smaller fires, we used stratified sampling.
+Before we split the data, we got rid of even more variables. Some we used in exploratory data analysis but decided not to use in modeling, and some were just not useful. Then we split our data into 80% training and 20% testing data. Because fire size is heavily skewed towards smaller fires, we used stratified sampling.
 
-There are xyz observations in the training set and xyz observations in the test set.
+There are 32903 observations in the training set and 8229 observations in the test set.
 
 ```{r}
-#first we make a dataframe containing only variables we want to use in our models
+#first we make a data frame containing only variables we want to use in our models
 fire_modeling_df <- us_wildfire_clean %>%
   dplyr::select(-fire_name, #remove fire name
          -fire_size_class, #remove fire size class
@@ -333,7 +356,7 @@ fire_modeling_df <- us_wildfire_clean %>%
          -wstation_eyear, #remove station year ended data recording
          -weather_file, #remove name of weather file
          -dstation_m, #remove distance of weather station to fire
-         -vegetation #remove vegetaiton because we already have it classed
+         -vegetation #remove vegetation because we already have it classed
          )
 
 #define split parameters
@@ -347,7 +370,6 @@ fire_test <- testing(us_wildfire_split)
 #set up folds in training data for cross validation
 train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
 ```
-
 
 ### Imputing Missing Data
 
