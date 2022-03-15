@@ -26,7 +26,7 @@ library(rsample) #used to split data
 library(janitor) #used to clean data names
 library(corrplot) #for correlation viz
 library(VIM) #for missing data viz
-library(missMDA) #for imputing missing data
+library(mice) #for imputing missing data
 library(ggfortify) #for PCA viz
 library(fastDummies) #for dummy coding
 library(caret) #for cross validation
@@ -373,7 +373,9 @@ train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
 
 ### Imputing Missing Data
 
-```{r}
+Next we impute (or replace) all the missing data in our weather columns. We use the predictive mean method of imputation, which works by predicting the value of the missing variable using regression, then randomly choosing a similar value from a pool of candidates that are found in the data. We use the default values of `m = 5` and `maxit = 5` to reduce computing time, but increasing the number of multiple imputations using the `m` argument and increasing the number of iterations through the `maxit` argument could increase accuracy. 
+
+```{r, results='hide'}
 #select weather cols     
 weather_train <- fire_train %>%
   select(temp_pre_30:prec_cont)
@@ -389,17 +391,19 @@ notweather_test <- fire_test %>%
   select(-colnames(weather_test))
 
 #imputation of weather data
-weather_train_imputed <- imputePCA(weather_train, ncp=4)
+weather_train_imputed <- mice(weather_train, m=5, maxit=5, meth='pmm', seed=500) %>% 
+  complete()
 
 
-weather_test_imputed <- imputePCA(weather_test, ncp=4)
+weather_test_imputed <- mice(weather_test, m=5, maxit=5, meth='pmm', seed=500) %>% 
+  complete()
 ```
 
 ### Principle Components
 
 ```{r}
 #Do PCA on both test and train data separately
-weather_train_PCA <- weather_train_imputed$completeObs %>%
+weather_train_PCA <- weather_train_imputed %>%
   scale(center = T, scale = T) %>%  #first scale and center the data
   prcomp(rank. = 4) #do PCA
 
@@ -407,7 +411,7 @@ weather_train_PCA <- weather_train_imputed$completeObs %>%
 #weather_train_PCA$x
 
 #Do PCA on both test and train data separately
-weather_test_PCA <- weather_test_imputed$completeObs %>%
+weather_test_PCA <- weather_test_imputed %>%
   scale(center = T, scale = T) %>%  #first scale and center the data
   prcomp(rank. = 4)
 
