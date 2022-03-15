@@ -410,14 +410,18 @@ fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>%
 
 ## Modeling As a Regression Problem
 
-### First of all, we applied 
+First of all, we applied multiple linear regression models on the dataset. The performance of the multiple linear regression will present why we need to apply machine learning approaches. First of all, I started with the whole variables including principal components. And then, less relevant variables were deleted from to find the optimal multiple linear regression model. 
 
 ```{r}
 lm_whole = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete)
 summary(lm_whole) %>% pander
 lm_whole2 <- update(lm_whole, . ~ . - stat_cause_descr)
 summary(lm_whole2) %>% pander
+```
 
+When we compare the whole region's regression results, it shows that the updated model is superior than the others. 
+
+```{r}
 lm_sw = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete[which(fire_train_complete$region == "SouthWest"),])
 summary(lm_sw) %>% pander
 lm_sw2 <- update(lm_sw, . ~ . - stat_cause_descr - PC2 - remoteness)
