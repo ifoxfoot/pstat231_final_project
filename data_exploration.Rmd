@@ -366,14 +366,14 @@ fire_modeling_df <- us_wildfire_clean %>%
 
 #define split parameters
 us_wildfire_split <- fire_modeling_df %>% 
-  initial_split(prop = 0.8, strata = "fire_size")
+  initial_split(prop = 0.8, strata = fire_size)
 
 #write split data to data frames
-fire_train <- training(us_wildfire_split)
-fire_test <- testing(us_wildfire_split)
+fire_train_split <- training(us_wildfire_split)
+fire_test_split <- testing(us_wildfire_split)
 
 #set up folds in training data for cross validation
-train_folds <- vfold_cv(fire_train, v = 10, repeats = 5)
+train_folds <- vfold_cv(fire_train_split, v = 10, repeats = 5)
 ```
 
 ### Imputing Missing Data
@@ -382,17 +382,17 @@ Next we impute (or replace) all the missing data in our weather columns. We use 
 
 ```{r, results='hide'}
 #select weather cols     
-weather_train <- fire_train %>%
+weather_train <- fire_train_split %>%
   select(temp_pre_30:prec_cont)
 
-weather_test <- fire_test %>%
+weather_test <- fire_test_split %>%
   select(temp_pre_30:prec_cont)
 
 #select cols not in weather
-notweather_train <- fire_train %>%
+notweather_train <- fire_train_split %>%
   select(-colnames(weather_train))
 
-notweather_test <- fire_test %>%
+notweather_test <- fire_test_split %>%
   select(-colnames(weather_test))
 
 #imputation of weather data
@@ -432,11 +432,15 @@ autoplot(weather_train_PCA,
 #put data back together
 
 #bind imputed weather data to rest of rows
-fire_train_complete <- cbind(notweather_train, weather_train_PCA$x) %>% 
+fire_train <- cbind(notweather_train, weather_train_PCA$x) %>% 
   na.omit()
 
-fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>% 
+fire_test <- cbind(notweather_test, weather_test_PCA$x) %>% 
   na.omit()
+
+#also saving test and training data as "fire_train_complete" and "fire_test_complete" so that models we made earlier still run
+fire_train_complete <- fire_train
+fire_test_complete <- fire_test
 ```
 
 ## Modeling As a Regression Problem
@@ -540,7 +544,7 @@ KNN works by calculating euclidean distance between observations, so all inputs 
 
 ```{r}
 #first we dummy code categorical variables (what about ordinal?)
-knn_ready_train <- dummy_cols(fire_train_complete, select_columns = 
+knn_ready_train <- dummy_cols(fire_train, select_columns = 
                                 c("stat_cause_descr", "region", "vegetation_classed", "season")) %>% 
   #then we get rid of non-dummy coded variables
   select(-stat_cause_descr, - region, - vegetation_classed, -season) %>% 
@@ -552,7 +556,7 @@ knn_ready_train[,-1] <- scale(knn_ready_train[,-1], center = T, scale = T)
 
 
 #of course our next step is to do the same to the test data
-knn_ready_test <- dummy_cols(fire_test_complete, 
+knn_ready_test <- dummy_cols(fire_test, 
                              select_columns = c("stat_cause_descr", "region", "vegetation_classed", "season")) %>% 
   select(-stat_cause_descr, - region, - vegetation_classed, -season) %>% 
   as.data.frame()
@@ -629,20 +633,26 @@ knn_mse_k1_k20_by1 <- read_csv(here("model_results", "knn", "knn_mse_k1_k20_by1.
 plot(knn_mse_k1_k500_by20$allK, knn_mse_k1_k500_by20$k_mse, type = "l", xlab = "k", ylab = "MSE", main = "MSE for K 1 through 500 at intervals of 20")
 ```
 
-When we look at K 1-20 we get the lowest MSE at around 3 before it starts increasing.
+When we look at K 1-20 we get the lowest MSE at 1 before it starts increasing.
 
 ```{r}
 plot(knn_mse_k1_k20_by1$allK, knn_mse_k1_k20_by1$k_mse, type = "l", xlab = "k", ylab = "MSE", main = "MSE for K 1 through 20 at intervals of 1")
 ```
 
-Just to confirm, we will print out the best number of neighbors.
+Just to confirm, we will print out the best number of neighbors and the associated MSE and RMSE.
 
 ```{r}
 #best number of neighbors
 numneighbor = max(knn_mse_k1_k20_by1$allK[knn_mse_k1_k20_by1$k_mse == min(knn_mse_k1_k20_by1$k_mse)])
 
-#print best number of neighbors
-numneighbor
+#print training mse
+training_mse <- knn_mse_k1_k20_by1 %>% 
+  filter(allK == numneighbor) %>% 
+  mutate(RMSE = sqrt(k_mse)) %>% 
+  rename(K = allK,
+         MSE = k_mse)
+
+training_mse
 ```
 
 Now that we've found the best number of nearest neighbors to consider, we try out KNN on our test data! Below is the test MSE and the test RMSE.
@@ -661,7 +671,7 @@ test_MSE
 sqrt(test_MSE)
 ```
 
-Over all, this model performs okay.
+Over all, this model performs okay. 
 
 ### Boosted Tree
 
