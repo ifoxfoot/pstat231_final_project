@@ -740,10 +740,11 @@ what type of modeling will we do? we must try 4 types
 
 # Results
 
-predictions without climate change
 
 How do predictions change with 2.5C increase in temp?
 
 # Conclusion
+
+We tried different methods to predict the size of a fire in case a wildfire occurs including linear regression, K-NN regression, random forest regression, and boosted trees. 
 
 
