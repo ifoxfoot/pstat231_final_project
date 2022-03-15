@@ -1,3 +1,4 @@
+cowsay
 tidyverse
 ggplot2
 tibble
@@ -13,7 +14,7 @@ janitor
 corrplot
 colorspace
 VIM
-missMDA
+mice
 ggfortify
 fastDummies
 lattice
@@ -30,7 +31,5 @@ maps
 mapproj
 viridisLite
 viridis
-cowsay
-mice
 pander
 knitr
