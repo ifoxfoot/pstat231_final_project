@@ -441,6 +441,8 @@ fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>%
 
 ## Modeling As a Regression Problem
 
+### Multiple Regression Analysis
+
 First of all, we applied multiple linear regression models on the dataset. The performance of the multiple linear regression will present why we need to apply machine learning approaches. First of all, I started with the whole variables including principal components. And then, less relevant variables were deleted from to find the optimal multiple linear regression model. 
 
 ```{r}
