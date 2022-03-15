@@ -42,7 +42,7 @@ library(ggplot2)
 library(ggrepel)
 library(mapproj)
 library(viridis)
-
+library(pander)
 #turns scientific notation off
 options(scipen = 100)
 
@@ -418,18 +418,35 @@ fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>%
 ### Linear regression for each region
 
 ```{r}
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete))
+lm_whole = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete)
+summary(lm_whole) %>% pander
+lm_whole2 <- update(lm_whole, . ~ . - stat_cause_descr)
+summary(lm_whole2) %>% pander
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "SouthWest"),]))
+lm_sw = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete[which(fire_train_complete$region == "SouthWest"),])
+summary(lm_sw) %>% pander
+lm_sw2 <- update(lm_sw, . ~ . - stat_cause_descr - PC2 - remoteness)
+summary(lm_sw2) %>% pander
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "SouthEast"),]))
+lm_se = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete[which(fire_train_complete$region == "SouthEast"),])
+summary(lm_se) %>% pander
+lm_se2 <- update(lm_se, . ~ . - stat_cause_descr - PC1 - PC4- year_diff - vegetation_classed)
+summary(lm_se2) %>% pander
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "MidWest"),]))
+lm_me = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete[which(fire_train_complete$region == "MidWest"),])
+summary(lm_me) %>% pander
+lm_me2 <- update(lm_me, . ~ . - stat_cause_descr - PC3 - year_diff - PC2)
+summary(lm_me2) %>% pander
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "West"),]))
+lm_w = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete[which(fire_train_complete$region == "West"),])
+summary(lm_w) %>% pander
+lm_w2 <- update(lm_w, . ~ . - stat_cause_descr - PC3 - PC4 - vegetation_classed)
+summary(lm_w2) %>% pander
 
-summary(lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff, data = fire_train_complete[which(fire_train_complete$region == "NorthEast"),]))
-
+lm_ne = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete[which(fire_train_complete$region == "NorthEast"),])
+summary(lm_ne) %>% pander
+lm_ne2 <- update(lm_ne, . ~ . - stat_cause_descr - vegetation_classed - year_diff - PC4 - PC3 - PC2)
+summary(lm_ne2) %>% pander
 ```
 
 
