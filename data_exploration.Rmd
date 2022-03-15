@@ -409,7 +409,7 @@ fire_test_complete <- cbind(notweather_test, weather_test_PCA$x) %>%
 
 ## Modeling As a Regression Problem
 
-### Linear regression for each region
+### First of all, we applied 
 
 ```{r}
 lm_whole = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete)
@@ -443,6 +443,19 @@ lm_ne2 <- update(lm_ne, . ~ . - stat_cause_descr - vegetation_classed - year_dif
 summary(lm_ne2) %>% pander
 ```
 
+The whole region's RMSE is 10,325.41. We use it for comparing the model's performance. The model performance will be checked with RMSE. 
+
+```{r}
+whole_pred = predict(lm_whole2, newdata = fire_test_complete)
+
+test_MSE <- mean((fire_test_complete$fire_size - whole_pred)^2)
+
+#print test MSE
+test_MSE
+
+#print test RMSE
+sqrt(test_MSE)
+```
 
 ### K Nearest Neighbor
 
