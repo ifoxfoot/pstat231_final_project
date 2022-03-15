@@ -1,7 +1,7 @@
 ---
 title: "Predicting Wildfire Size"
-author: "Iris Foxfoot, Seonga Cho, Vanessa"
-date: "2/3/2022"
+author: "Iris Foxfoot, Seonga Cho, Vanessa Echeverri Figueroa"
+date: "15/3/2022"
 bibliography: bibliography.bib
 csl: apa.csl
 output: 
@@ -67,7 +67,7 @@ Since this model will help to understand why fires can grow to a catastrophical 
 ## Data and Packages Used
 
 
-This dataset is available on \href{https://www.kaggle.com/capcloudcoder/us-wildfire-data-plus-other-attributes/code}{Kaggle} and it is a subset of larger fires.
+This dataset is available on [Kaggle](https://www.kaggle.com/capcloudcoder/us-wildfire-data-plus-other-attributes/code) and it is a subset of larger fires.
 
 Important attributes include
 
@@ -600,11 +600,18 @@ fire_size_boost = gbm(fire_size~.,
                     )
 ```
 
-The 4 most prominent predictors to fire size are latitude, magnitude of the fire, remoteness (that is the non-dimensional distance to closest city), humidity at the wildfire location up to one day prior to fire. The MSE using the training set is much lower than the RMSE on the test data set, indicating overfeeting. Additionally, in the Figure that depicts the boosting tree performance with different number of trees, the test error increases as the number of trees increases. This is a sign of overfiting.
+The 4 most prominent predictors to fire size are latitude, magnitude of the fire, remoteness (that is the non-dimensional distance to closest city), humidity at the wildfire location up to one day prior to fire. The MSE using the training set is much lower than the RMSE on the test data set, indicating overfeeting.
 
 ```{r plots and summary for BT}
 #the model summary creates a pretty visualization
 summary(fire_size_boost,  cBars = 10,normalize = T)
+```
+
+The following plots show the relation betweeen the variables that have higher relative influence (x axis) and the  mapping function $f(x)$ (in the y axis). There is a positive relation  between fire magnitude and wind at location 7 days prior to wildfire with the response fire size. However, for the other variable, the relationship is not that clear.  
+```{r plots}
+plot(fire_size_boost,i="fire_mag") 
+plot(fire_size_boost,i="latitude") 
+plot(fire_size_boost,i="wind_pre_7") 
 ```
 
 Now, let us check the MSE for both, training and test datasets, respectively.
@@ -625,18 +632,29 @@ predictions_test_boost <- predict(fire_size_boost, data = fire_test)
 
 #calculate rmse for training data
 RMSE(predictions_test_boost, fire_test$fire_size)
+```
 
+Next, we calculate the error as a function of number of trees from 100 to 1000 with a step of 10 and create a prediction matrix that contains in its columns the predictions for each tree size.
+```{r compare with rf}
 ###compute test error as a function of number of trees
 n.trees = seq(from=100 ,to=1000, by=10) #vector containing different number of trees
-
+```
+The dimension of the prediction matrix is
+```{r}
 #create a prediction matrix for each tree
 predmatrix<-predict(fire_size_boost, data = fire_test,n.trees = n.trees)
 dim(predmatrix) #dimentions of the Prediction Matrix
+```
 
+This is a sample of the test error calculated for each of the 100 trees averaged.
+```{r}
 #calculate the MSE
 test.error<-with(fire_test,apply( (predmatrix-fire_size)^2,2,mean))
 head(test.error) #contains the Mean squared test error for each of the 100 trees averaged
+```
 
+To check the performance of boosting on the test set, we include the plot containing the different MSE on the train dataset calculated for different size trees. This Figure is depicting the boosting tree performance with different number of trees and it shows that the test error increases as the number of trees increases. This shows us the sensitivity of boosted gradient methods to tree size and indicates that this model does not converge since the error should decrease as the number of trees used increases.
+```{r}
 #Plotting the test error vs number of trees
 
 plot(n.trees , test.error , pch=19,col="blue",xlab="Number of Trees",ylab="Test Error", main = "Perfomance of Boosting on Test Set")
@@ -645,16 +663,10 @@ plot(n.trees , test.error , pch=19,col="blue",xlab="Number of Trees",ylab="Test 
 ```
 
 
-The following plots show the relation betweeen the variables that have higher relative influence (x axis) and the  mapping function $f(x)$ (in the y axis). There is a positive relation between fire magnitude with the response fire size, however, for the other variables, the relationship is not that clear.  
-```{r plots}
-plot(fire_size_boost,i="fire_mag") 
-plot(fire_size_boost,i="latitude") 
-plot(fire_size_boost,i="remoteness") 
-```
 
 ### Random Forest
 
-Now, let us run a random forest model for the same data.
+Random forest is also a supervised method to perform regression and clasification tasks. It also creates single trees at random using a boostraping sampling method, also called _bagging_. It trains each tree independently and combine them by computing the average of all trees estimators. Since every tree is separately trained, it is difficult for this method to suffer overfiting when increasing the tree size, however, larger tree sizes makes this model computationally slow. We perform a random forest model for the same data used for boosted trees. 
 ```{r, cache = TRUE}
 #train model
 set.seed(123)
@@ -668,12 +680,20 @@ fire_size_rf = randomForest(fire_size ~ ., #writing the formula
                           )
 
 ```
-9 variables were considered at each split and 500 trees were used to fit the data. The importance of the variables are in this model are fire magnitude, precipitation up to the day the fire was contained, temperature at the location up to 30 days before wildfire, latitude, and wind at the location upto 30 days prior. The RMSE for this model is higher for the training dataset than in the case of the boosted trees model, but it is better on the testing dataset, which means the prediction power of the random forest model performs better than the boosted trees model.  
+9 variables were considered at each split and 500 trees were used to fit the data.  
 ```{r plot RF}
 print(fire_size_rf)
+
+```
+The error decreases as the tree size increases. 
+```{r}
 #plot error
 plot(fire_size_rf)
 
+```
+
+We also check the variable importance for fire size, where the variables that explain better fire size are fire magnitude, remoteness, wind at the location up to the day the fire was contained, precipitation at the location up to the day the fire was contained and temperature at the location up to the day the fire was contained. There is a consensus between boosted trees model and random forest model in 2 of the variables that are important for explaining fire size: fire magnitude, and temperature at the location up to the day the fire was contained.
+```{r}
 #check the importance
 fire_size_rf$importance
 
@@ -683,6 +703,10 @@ varImpPlot(fire_size_rf,
            main = "Variable Importance for fire size random forest model", 
            n.var = 5)
 
+```
+
+Next, we compute the RMSE on the train and test datasets, respectively. The RMSE for this model is higher for the training dataset than in the case of the boosted trees model, but it is better on the testing dataset, which means, surprisingly, that the prediction power of the random forest model performs better than the boosted trees model.  
+```{r}
 #calculate training error
 
 #predict values using training data
@@ -696,17 +720,17 @@ RMSE(predictions_train_rf, fire_train$fire_size)
 #predict values using test data
 predictions_test_rf <- predict(fire_size_rf, data = fire_test)
 
-#calculate rmse for training data
+#calculate rmse for test data
 RMSE(predictions_test_rf, fire_test$fire_size)
 
 #Plotting the test error vs number of trees
 ```
-
+Lasltly, we compare the test error of the boosted trees model with different tree sizes with the minimum error of the random forest model. Then, we can conclude that the random forest performs better than boosted trees.
 ```{r plot RF vs BT}
 plot(n.trees , test.error , pch=19,col="blue",xlab="Number of Trees",ylab="Test Error", main = "Perfomance of Boosting on Test Set")
 
 #adding the RandomForests Minimum Error line trained on same data and similar parameters
-abline(h = min(test.error),col="red") #test.err is the test error of a Random forest fitted on same data
+abline(h = (RMSE(predictions_test_rf, fire_test$fire_size))^2,col="red") # test error of a Random forest fitted on same data
 legend("topright",c("Minimum Test error Line for Random Forests"),col="red",lty=1,lwd=1)
 ```
 
