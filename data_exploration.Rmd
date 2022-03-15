@@ -600,7 +600,7 @@ fire_size_boost = gbm(fire_size~.,
                     )
 ```
 
-The 4 most prominent predictors to fire size are latitude, magnitude of the fire, remoteness (that is the non-dimensional distance to closest city), humidity at the wildfire location up to one day prior to fire. The MSE using the training set is much lower than the RMSE on the test data set, indicating overfeeting.
+The 4 most prominent predictors to fire size are latitude, magnitude of the fire, remoteness (that is the non-dimensional distance to closest city), humidity at the wildfire location up to one day prior to fire. The MSE using the training set is much lower than the RMSE on the test data set, indicating overfiting.
 
 ```{r plots and summary for BT}
 #the model summary creates a pretty visualization
@@ -745,6 +745,5 @@ How do predictions change with 2.5C increase in temp?
 
 # Conclusion
 
-We tried different methods to predict the size of a fire in case a wildfire occurs including linear regression, K-NN regression, random forest regression, and boosted trees. 
-
+Wildfires have intensified in the last couple decades in United States. Since wildifres can affect in multiple ways, not only damaging structures and generating important losses, but affecting vulnerable population, especially when the size of fires scalate out of proportions. Therefore, predicting the size of a fires can serve as support to prevent catastrophes. With that purpose, we tried different methods to predict the size of a fire in case a wildfire occurs including linear regression with dimensionality reduction through PCA, K-NN regression, random forest regression, and boosted trees. We find that the RMSE on the test data is lower for K-NN regression, which means that K-NN is the method with the best predictive power. Regarding random forest and boosted trees, random forest performed better. Boosted trees is sensitive to outliers and requires a carefully tunning of hyperparameters, meanwhile random forest is not affected by the number of trees, then it tends to not suffer from overfiting.
 
