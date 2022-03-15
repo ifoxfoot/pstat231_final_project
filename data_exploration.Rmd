@@ -41,6 +41,7 @@ library(ggrepel)
 library(mapproj)
 library(viridis)
 library(pander)
+library(knitr)
 #turns scientific notation off
 options(scipen = 100)
 
@@ -427,10 +428,10 @@ summary(lm_se) %>% pander
 lm_se2 <- update(lm_se, . ~ . - stat_cause_descr - PC1 - PC4- year_diff - vegetation_classed)
 summary(lm_se2) %>% pander
 
-lm_me = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete[which(fire_train_complete$region == "MidWest"),])
-summary(lm_me) %>% pander
-lm_me2 <- update(lm_me, . ~ . - stat_cause_descr - PC3 - year_diff - PC2)
-summary(lm_me2) %>% pander
+lm_mw = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete[which(fire_train_complete$region == "MidWest"),])
+summary(lm_mw) %>% pander
+lm_mw2 <- update(lm_mw, . ~ . - stat_cause_descr - PC3 - year_diff - PC2)
+summary(lm_mw2) %>% pander
 
 lm_w = lm(fire_size ~ PC1 + PC2 + PC3 + PC4 + year_diff + remoteness + vegetation_classed + stat_cause_descr, data = fire_train_complete[which(fire_train_complete$region == "West"),])
 summary(lm_w) %>% pander
@@ -450,11 +451,50 @@ whole_pred = predict(lm_whole2, newdata = fire_test_complete)
 
 test_MSE <- mean((fire_test_complete$fire_size - whole_pred)^2)
 
-#print test MSE
-test_MSE
+#print test RMSE
+whole_test_RMSE = sqrt(test_MSE)
+```
+
+```{r}
+sw_pred = predict(lm_sw2, newdata = fire_test_complete[which(fire_test_complete$region == "SouthWest"),])
+
+sw_test_MSE <- mean((fire_test_complete$fire_size[which(fire_test_complete$region == "SouthWest")] - sw_pred)^2)
 
 #print test RMSE
-sqrt(test_MSE)
+sw_test_RMSE = sqrt(sw_test_MSE)
+
+se_pred = predict(lm_se2, newdata = fire_test_complete[which(fire_test_complete$region == "SouthEast"),])
+
+se_test_MSE <- mean((fire_test_complete$fire_size[which(fire_test_complete$region == "SouthEast")] - se_pred)^2)
+
+#print test RMSE
+se_test_RMSE = sqrt(se_test_MSE)
+
+mw_pred = predict(lm_mw2, newdata = fire_test_complete[which(fire_test_complete$region == "MidWest"),])
+
+mw_test_MSE <- mean((fire_test_complete$fire_size[which(fire_test_complete$region == "MidWest")] - mw_pred)^2)
+
+#print test RMSE
+mw_test_RMSE = sqrt(mw_test_MSE)
+
+w_pred = predict(lm_w2, newdata = fire_test_complete[which(fire_test_complete$region == "West"),])
+
+w_test_MSE <- mean((fire_test_complete$fire_size[which(fire_test_complete$region == "West")] - w_pred)^2)
+
+#print test RMSE
+w_test_RMSE = sqrt(w_test_MSE)
+
+ne_pred = predict(lm_w2, newdata = fire_test_complete[which(fire_test_complete$region == "NorthEast"),])
+
+ne_test_MSE <- mean((fire_test_complete$fire_size[which(fire_test_complete$region == "NorthEast")] - ne_pred)^2)
+
+#print test RMSE
+ne_test_RMSE = sqrt(ne_test_MSE)
+
+table_lm = data.frame(Region = c("Whole US", "North East", "Mid West", "West", "South West", "South East"),
+                      RMSE = c(whole_test_RMSE, ne_test_RMSE, mw_test_RMSE, w_test_RMSE, sw_test_RMSE, se_test_RMSE),
+                      NumberofObservation = c(length(whole_pred),length(ne_pred),length(mw_pred),length(w_pred),length(sw_pred),length(se_pred)))
+kable(table_lm, caption = "Linear Model's RMSE")
 ```
 
 ### K Nearest Neighbor
