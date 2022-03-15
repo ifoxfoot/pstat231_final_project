@@ -583,11 +583,12 @@ Over all, this model performs okay.
 
 ### Boosted Tree
 
+Gradient boosted decision trees partition data by asking questions about that data (create single trees) and combines individual trees by using the boosting method. The boosting method basically seeks to achive a strong learner from many sequentially connected weak learners combining a learning algorithm in series, where the weak learners in this method are single decision trees. This method iteratively adds a tree, and everytime a tree is added, it fits the new version that contains one more tree, but focusing on minimizing the errors from the previous tree. The sequential addition of trees makes the boosting method to learn slowly, but one advantage is that models that learn slowly can perform better in terms of prediction. Gradient boosted decision trees can be used for regression purposes and also classification tasks. In this case, we perform a regression to detect the size of a fire. Since we perform a regression, the MSE is used to detect the residuals and therefore it helps us determine whether it performs well or not comparing to the other methods. We again use the training data to train the model and the test data to test how can it perform under new observations. 
 ```{r,cache = TRUE}
 
 #train boosted tree model
 set.seed(123)
-fire_train <- as.data.frame(unclass(fire_train),                     # Convert all columns to factor
+fire_train <- as.data.frame(unclass(fire_train),         # Convert all columns to factor
                             stringsAsFactors = T)
 fire_test <- as.data.frame(unclass(fire_test),
                            stringsAsFactors = T)
@@ -606,6 +607,7 @@ The 4 most prominent predictors to fire size are latitude, magnitude of the fire
 summary(fire_size_boost,  cBars = 10,normalize = T)
 ```
 
+Now, let us check the MSE for both, training and test datasets, respectively.
 
 ```{r training error}
 #calculate training error
