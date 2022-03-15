@@ -2,6 +2,8 @@
 title: "Predicting Wildfire Size"
 author: "Iris Foxfoot, Seonga Cho, Vanessa"
 date: "2/3/2022"
+bibliography: bibliography.bib
+csl: apa.csl
 output: 
   html_document:
     toc: true # table of content true
@@ -51,19 +53,22 @@ set.seed(123)
 
 # Introduction
 
-The purpose of this project is to use machine learning techniques to predict which wildfires will grow to a catastrophic size. Our most accurate model will then be used to assess how global climate change may influence a wildfires predicted size.
+The purpose of this project is to use machine learning techniques to predict the size of a fire in case a wildfire occurs at a certain location, considering different characteristics for climate, vegetation location, season, among others. Our most accurate model will then be used to assess how different physical and climate characteristics may influence wildfires predicted size and potentially support decisions to prevent damages to structures and injuries to vulnerable populations. 
 
 ## Background
 
-fire situation in North America, climate change, etc
+Wildfires have been intensifying in United States during the last decades, not only in ocurrence, but in flame size. Their causes range between propensity due to physical characteristics [see @keeley20092007] to external factors, such as fires caused by Native American population practices [@stephens2007prehistoric], climate change, among other reasons. They have not only caused several injuries to the population, even deaths, but have also destroyed structures and caused damage that are costly to repair  [@keeley20092007]. Despite wildfires are necessary to provide nutrients to the forest and maintain it healthy as part of its regular lifecycle, understading their intensification and causes may provide an outlook to prevent wildfires from escalating to disproporcionate sizes.
+
 
 ## Why this model is useful
 
-What will it be used for?
+Since this model will help to understand why fires can grow to a catastrophical size, it will be used to predict the fire size in presence of wildfire. This information can be valuable to support policy makers in prevention of deaths, affection to structures, protection to vulnerable populations, and creation of emergency plans. 
+
 
 ## Data and Packages Used
 
-This dataset is available on Kaggle. It is a subset of larger fires 
+
+This dataset is available on \href{https://www.kaggle.com/capcloudcoder/us-wildfire-data-plus-other-attributes/code}{Kaggle} and it is a subset of larger fires.
 
 Important attributes include
 
@@ -660,17 +665,31 @@ Over all, this model performs okay.
 
 ### Boosted Tree
 
-```{r, eval = FALSE}
+```{r,cache = TRUE}
+
 #train boosted tree model
+set.seed(123)
+fire_train <- as.data.frame(unclass(fire_train),                     # Convert all columns to factor
+                            stringsAsFactors = T)
+fire_test <- as.data.frame(unclass(fire_test),
+                           stringsAsFactors = T)
 fire_size_boost = gbm(fire_size~., 
                       data = fire_train,
-                      n.trees = 500, 
+                      n.trees = 1000,
+                      shrinkage = 0.01,
                       interaction.depth = 4
                     )
+```
 
+The 4 most prominent predictors to fire size are latitude, magnitude of the fire, remoteness (that is the non-dimensional distance to closest city), humidity at the wildfire location up to one day prior to fire. The MSE using the training set is much lower than the RMSE on the test data set, indicating overfeeting. Additionally, in the Figure that depicts the boosting tree performance with different number of trees, the test error increases as the number of trees increases. This is a sign of overfiting.
+
+```{r plots and summary for BT}
 #the model summary creates a pretty visualization
-summary(fire_size_boost)
+summary(fire_size_boost,  cBars = 10,normalize = T)
+```
 
+
+```{r training error}
 #calculate training error
 
 #predict values using training data
@@ -686,22 +705,57 @@ predictions_test_boost <- predict(fire_size_boost, data = fire_test)
 
 #calculate rmse for training data
 RMSE(predictions_test_boost, fire_test$fire_size)
+
+###compute test error as a function of number of trees
+n.trees = seq(from=100 ,to=1000, by=10) #vector containing different number of trees
+
+#create a prediction matrix for each tree
+predmatrix<-predict(fire_size_boost, data = fire_test,n.trees = n.trees)
+dim(predmatrix) #dimentions of the Prediction Matrix
+
+#calculate the MSE
+test.error<-with(fire_test,apply( (predmatrix-fire_size)^2,2,mean))
+head(test.error) #contains the Mean squared test error for each of the 100 trees averaged
+
+#Plotting the test error vs number of trees
+
+plot(n.trees , test.error , pch=19,col="blue",xlab="Number of Trees",ylab="Test Error", main = "Perfomance of Boosting on Test Set")
+
+
+```
+
+
+The following plots show the relation betweeen the variables that have higher relative influence (x axis) and the  mapping function $f(x)$ (in the y axis). There is a positive relation between fire magnitude with the response fire size, however, for the other variables, the relationship is not that clear.  
+```{r plots}
+plot(fire_size_boost,i="fire_mag") 
+plot(fire_size_boost,i="latitude") 
+plot(fire_size_boost,i="remoteness") 
 ```
 
 ### Random Forest
 
-```{r, eval = FALSE}
+Now, let us run a random forest model for the same data.
+```{r, cache = TRUE}
 #train model
+set.seed(123)
 fire_size_rf = randomForest(fire_size ~ ., #writing the formula
-                          data = fire_train_complete, #specifying training data to be used
+                          data = fire_train, #specifying training data to be used
                           mtry = 9, #setting number of variables to randomly sample per each split
                           ntree= 500, #setting number of trees
                           mode = "regression", #specifying regression
                           na.action = na.omit, #specifying what to do with NAs
                           importance = TRUE #specifying importance of variables should be assessed
                           )
+
+```
+9 variables were considered at each split and 500 trees were used to fit the data. The importance of the variables are in this model are fire magnitude, precipitation up to the day the fire was contained, temperature at the location up to 30 days before wildfire, latitude, and wind at the location upto 30 days prior. The RMSE for this model is higher for the training dataset than in the case of the boosted trees model, but it is better on the testing dataset, which means the prediction power of the random forest model performs better than the boosted trees model.  
+```{r plot RF}
+print(fire_size_rf)
 #plot error
 plot(fire_size_rf)
+
+#check the importance
+fire_size_rf$importance
 
 #plot variable importance
 varImpPlot(fire_size_rf, 
@@ -724,6 +778,16 @@ predictions_test_rf <- predict(fire_size_rf, data = fire_test)
 
 #calculate rmse for training data
 RMSE(predictions_test_rf, fire_test$fire_size)
+
+#Plotting the test error vs number of trees
+```
+
+```{r plot RF vs BT}
+plot(n.trees , test.error , pch=19,col="blue",xlab="Number of Trees",ylab="Test Error", main = "Perfomance of Boosting on Test Set")
+
+#adding the RandomForests Minimum Error line trained on same data and similar parameters
+abline(h = min(test.error),col="red") #test.err is the test error of a Random forest fitted on same data
+legend("topright",c("Minimum Test error Line for Random Forests"),col="red",lty=1,lwd=1)
 ```
 
 what type of modeling will we do? we must try 4 types
