@@ -685,7 +685,8 @@ test_MSE <- mean((as.numeric(pred.YTest) - YTest)^2)
 test_MSE
 
 #print test RMSE
-sqrt(test_MSE)
+knn_rmse = sqrt(test_MSE)
+knn_rmse
 ```
 
 Over all, this model performs okay. 
@@ -740,7 +741,8 @@ RMSE(predictions_train_boost, fire_train$fire_size)
 predictions_test_boost <- predict(fire_size_boost, data = fire_test)
 
 #calculate rmse for training data
-RMSE(predictions_test_boost, fire_test$fire_size)
+bt_rmse = RMSE(predictions_test_boost, fire_test$fire_size)
+bt_rmse
 ```
 
 Next, we calculate the error as a function of number of trees from 100 to 1000 with a step of 10 and create a prediction matrix that contains in its columns the predictions for each tree size.
@@ -830,7 +832,8 @@ RMSE(predictions_train_rf, fire_train$fire_size)
 predictions_test_rf <- predict(fire_size_rf, data = fire_test)
 
 #calculate rmse for test data
-RMSE(predictions_test_rf, fire_test$fire_size)
+rf_rmse = RMSE(predictions_test_rf, fire_test$fire_size)
+rf_rmse
 
 #Plotting the test error vs number of trees
 ```
@@ -843,7 +846,25 @@ abline(h = (RMSE(predictions_test_rf, fire_test$fire_size))^2,col="red") # test 
 legend("topright",c("Minimum Test error Line for Random Forests"),col="red",lty=1,lwd=1)
 ```
 
+<<<<<<< HEAD
 # Results & Conclusion
+=======
+what type of modeling will we do? we must try 4 types
+
+- neural network
+
+# Results
+
+```{r}
+table_approach = data.frame(Method = c("Multiple Regression", "K Nearest Neighbor", "Boosted Tree", "Random Forest"),
+                      RMSE = c(whole_test_RMSE, knn_rmse, bt_rmse, rf_rmse))
+kable(table_approach, caption = "RMSE Comparison Table")
+```
+
+How do predictions change with 2.5C increase in temp?
+
+# Conclusion
+>>>>>>> 98dd63485cb179b410a58f1623a2abba0556d278
 
 Wildfires have intensified in the last couple decades in United States. Since wildifres can affect in multiple ways, not only damaging structures and generating important losses, but affecting vulnerable population, especially when the size of fires scalate out of proportions. Therefore, predicting the size of a fires can serve as support to prevent catastrophes. With that purpose, we tried different methods to predict the size of a fire in case a wildfire occurs including linear regression with dimensionality reduction through PCA, K-NN regression, random forest regression, and boosted trees. We find that the RMSE on the test data is lower for K-NN regression, which means that K-NN is the method with the best predictive power. Regarding random forest and boosted trees, random forest performed better. Boosted trees is sensitive to outliers and requires a carefully tunning of hyperparameters, meanwhile random forest is not affected by the number of trees, then it tends to not suffer from overfiting.
 
