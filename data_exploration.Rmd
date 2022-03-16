@@ -670,7 +670,8 @@ test_MSE <- mean((as.numeric(pred.YTest) - YTest)^2)
 test_MSE
 
 #print test RMSE
-sqrt(test_MSE)
+knn_rmse = sqrt(test_MSE)
+knn_rmse
 ```
 
 Over all, this model performs okay. 
@@ -725,7 +726,8 @@ RMSE(predictions_train_boost, fire_train$fire_size)
 predictions_test_boost <- predict(fire_size_boost, data = fire_test)
 
 #calculate rmse for training data
-RMSE(predictions_test_boost, fire_test$fire_size)
+bt_rmse = RMSE(predictions_test_boost, fire_test$fire_size)
+bt_rmse
 ```
 
 Next, we calculate the error as a function of number of trees from 100 to 1000 with a step of 10 and create a prediction matrix that contains in its columns the predictions for each tree size.
@@ -815,7 +817,8 @@ RMSE(predictions_train_rf, fire_train$fire_size)
 predictions_test_rf <- predict(fire_size_rf, data = fire_test)
 
 #calculate rmse for test data
-RMSE(predictions_test_rf, fire_test$fire_size)
+rf_rmse = RMSE(predictions_test_rf, fire_test$fire_size)
+rf_rmse
 
 #Plotting the test error vs number of trees
 ```
@@ -834,6 +837,11 @@ what type of modeling will we do? we must try 4 types
 
 # Results
 
+```{r}
+table_approach = data.frame(Method = c("Multiple Regression", "K Nearest Neighbor", "Boosted Tree", "Random Forest"),
+                      RMSE = c(whole_test_RMSE, knn_rmse, bt_rmse, rf_rmse))
+kable(table_approach, caption = "RMSE Comparison Table")
+```
 
 How do predictions change with 2.5C increase in temp?
 
