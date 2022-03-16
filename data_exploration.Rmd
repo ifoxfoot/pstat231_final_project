@@ -53,45 +53,58 @@ set.seed(123)
 
 # Introduction
 
-The purpose of this project is to use machine learning techniques to predict the size of a fire in case a wildfire occurs at a certain location, considering different characteristics for climate, vegetation location, season, among others. Our most accurate model will then be used to assess how different physical and climate characteristics may influence wildfires predicted size and potentially support decisions to prevent damages to structures and injuries to vulnerable populations. 
+The purpose of this project is to use machine learning techniques to predict the size of a fire in the event that a wildfire occurs at a certain location, considering different characteristics for climate, vegetation, season, and more. Our most accurate model will then be used to assess how different physical and climate characteristics may influence wildfires predicted size and potentially support decisions to prevent damages to structures and injuries to vulnerable populations. 
 
 ## Background
 
-Wildfires have been intensifying in United States during the last decades, not only in ocurrence, but in flame size. Their causes range between propensity due to physical characteristics [see @keeley20092007] to external factors, such as fires caused by Native American population practices [@stephens2007prehistoric], climate change, among other reasons. They have not only caused several injuries to the population, even deaths, but have also destroyed structures and caused damage that are costly to repair  [@keeley20092007]. Despite wildfires are necessary to provide nutrients to the forest and maintain it healthy as part of its regular lifecycle, understading their intensification and causes may provide an outlook to prevent wildfires from escalating to disproporcionate sizes.
-
+Wildfires have been intensifying in United States during the last decades, not only in occurrence, but in flame size. Their causes range between propensity due to physical characteristics [see @keeley20092007] to external factors, such as fires caused by Native American population practices [@stephens2007prehistoric], and climate change, among other reasons. They have not only caused several injuries to the population, and even deaths, but have also destroyed structures and caused damage that are costly to repair [@keeley20092007]. However, wildfires are necessary to provide nutrients to the forest and are part of its regular life cycle. Understanding wildfire intensification and causes may provide an insight to prevent wildfires from escalating to disproportionate sizes.
 
 ## Why this model is useful
 
-Since this model will help to understand why fires can grow to a catastrophical size, it will be used to predict the fire size in presence of wildfire. This information can be valuable to support policy makers in prevention of deaths, affection to structures, protection to vulnerable populations, and creation of emergency plans. 
+Since this model will help to understand why fires can grow to a catastrophic size, it will be used to predict the fire size in the event of a wildfire. This information can be valuable to support policy makers in prevention of death and destruction, protection to vulnerable populations, and creation of emergency plans. 
 
 
-## Data and Packages Used
+## Data Overview
 
+This dataset is available on [Kaggle](https://www.kaggle.com/capcloudcoder/us-wildfire-data-plus-other-attributes/code) and it is a subset of a data set of US wildfires. The author of this data set took a subset of the largest wildfires, and used spatial information to extract weather and vegetation features from other data sources. 
 
-This dataset is available on [Kaggle](https://www.kaggle.com/capcloudcoder/us-wildfire-data-plus-other-attributes/code) and it is a subset of larger fires.
-
-Important attributes include
+Important attributes include:
 
 * `fire_size` - the size of the fire in acres
+
+* `fire_mag` - magnitude of fire intensity (scaled version of fire_size)
+
+* `fire_size_class` - the size of fires classified into A though G (with G being the largest fires)
 
 * `stat_cause_descr` - the cause of the fire
 
 * `vegetation` - code corresponding to vegetation type
 
-* `temp_cont` - temperature (Celsius) when the fire was contained
+* Variables starting with `temp` - Average temperature (Celsius) over a specified period of time (30 days, 15 days, or 7 days, or the day the fire was contained)
 
-A complete codebook is available in the project file
+* Variables starting with `wind` - Average windspeed (meters per second) over a specified period of time (30 days, 15 days, or 7 days, or the day the fire was contained)
+
+* Variables starting with `hum` - Average humidity (in percent humidity) over a specified period of time (30 days, 15 days, or 7 days, or the day the fire was contained)
+
+* Variables starting with `prec` - Precipitation (mm) over a specified period of time (30 days, 15 days, or 7 days, or the day the fire was contained)
+
+* `remoteness` - The non-dimensional distance to closest city (units not specified by data author)
+
+The data set also contains spatial coordinates in the form of longitude and latitude, as well as information on the date of the fire and the state in which it occurred.
+
+A complete code book is available in the project file in `archive\Wildfire_att_descripition.txt`
 
 ```{r}
 #read in dataset
 us_wildfire <- read_csv(here("archive", "FW_Veg_Rem_Combined.csv"))
-#Following to the National Geographic Education
+#Following to the National Geographic Education, states were classified to regions
 us_wildfire$region = "NorthEast"
 us_wildfire[which(us_wildfire$state %in% c("AK", "WA", "OR", "CA", "NV", "ID", "MT", "WY", "UT", "CO")),"region"] = "West"
 us_wildfire[which(us_wildfire$state %in% c("AZ", "NM", "TX", "OK")), "region"] = "SouthWest"
 us_wildfire[which(us_wildfire$state %in% c("ND", "SD", "NE", "KS", "MN", "IA", "MO", "WI", "IL", "MI", "IN", "OH")), "region"] = "MidWest"
 us_wildfire[which(us_wildfire$state %in% c("AR", "LA", "MS", "AL", "GA", "FL", "SC", "NC", "TN", "KY", "VA", "WV")), "region"] = "SouthEast"
 
+#year was reclassified to so that 1990 = 0 and 2015 = 24
 us_wildfire$year_diff = us_wildfire$disc_pre_year - min(us_wildfire$disc_pre_year)
 
 ```
@@ -405,6 +418,8 @@ weather_test_imputed <- mice(weather_test, m=5, maxit=5, meth='pmm', seed=500) %
 ```
 
 ### Principle Components
+
+Since we know that weather columns are strongly correlated with each other, we decided to use PCA to reduce the number of columns to 4 principle components that are uncorrelated. We decided to use 4 components because we suspect there are four underlying factors in the data: temperature, humidity, windspeed, and precipitation. 
 
 ```{r}
 #Do PCA on both test and train data separately
@@ -828,15 +843,8 @@ abline(h = (RMSE(predictions_test_rf, fire_test$fire_size))^2,col="red") # test 
 legend("topright",c("Minimum Test error Line for Random Forests"),col="red",lty=1,lwd=1)
 ```
 
-what type of modeling will we do? we must try 4 types
-
-- neural network
-
-# Results
-
-
-How do predictions change with 2.5C increase in temp?
-
-# Conclusion
+# Results & Conclusion
 
 Wildfires have intensified in the last couple decades in United States. Since wildifres can affect in multiple ways, not only damaging structures and generating important losses, but affecting vulnerable population, especially when the size of fires scalate out of proportions. Therefore, predicting the size of a fires can serve as support to prevent catastrophes. With that purpose, we tried different methods to predict the size of a fire in case a wildfire occurs including linear regression with dimensionality reduction through PCA, K-NN regression, random forest regression, and boosted trees. We find that the RMSE on the test data is lower for K-NN regression, which means that K-NN is the method with the best predictive power. Regarding random forest and boosted trees, random forest performed better. Boosted trees is sensitive to outliers and requires a carefully tunning of hyperparameters, meanwhile random forest is not affected by the number of trees, then it tends to not suffer from overfiting.
+
+# References
